@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Story Game</title>
+    <link rel="stylesheet" href="dreamintro.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+
+<!-- 加载 Three.js 主库 -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+
+<!-- 加载 GLTFLoader，必须放在 three.js 之后 -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Kalam&display=swap" rel="stylesheet">
+
+</head>
+
+<body>
+    <div id="loader">Loading...</div>
+
+    <div id="game-container">
+        <div id="story-container">
+            <div id="scene-image-container"></div>
+
+            <img id="scene-image" src="" alt="Scene Image" />
+            <p id="story-text">Welcome to the story! Click to begin.</p>
+        </div>
+
+        <div id="interaction-zone">
+        <button id="next-button" onclick="nextScene()">Next</button>
+
+        <!-- 隐藏原按钮 
+        <button id="next-button" style="display: none;">Next</button>-->
+
+
+        <!-- 3D Canvas 放置在按钮区域 -->
+        <div id="glb-button-container" style="width: 300px; height: 300px; margin: auto;"></div>
+    </div>
+
+    </div>
+        <!-- 3D 渲染 -->
+        <script src="dreamintro.js"></script>
+</body>
+
+</html>

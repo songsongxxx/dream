@@ -1,0 +1,185 @@
+
+
+@font-face {
+    font-family: 'Inkdrop';
+    src: url('https://raw.githubusercontent.com/songsongxxx/qqspace/main/fontsassets/inkdrop.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+  }
+
+  @font-face {
+    font-family: 'PencilPete';
+    src: url('PencilPete TRIAL/PencilPeteFONT.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+  }
+
+  /* 🫧 Processed Results Page Styling */
+
+#processedResults {
+    margin-top: 40px;
+    padding: 30px 20px;
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(8px);
+    border-radius: 30px;
+    box-shadow:
+        inset 0 0 8px rgba(255, 255, 255, 0.4),
+        0 4px 12px rgba(200, 200, 200, 0.2);
+    text-align: center;
+  font-family: 'PencilPete', sans-serif;
+  font-weight: bold; /* 让浏览器伪加粗一点点 */
+    max-width: 700px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+#processedText {
+    font-size: clamp(18px, 3vw, 28px);
+    color: #444;
+    margin-bottom: 30px;
+    word-wrap: break-word;
+}
+
+#processedAudio {
+    margin-bottom: 20px;
+}
+
+/* 音频播放器美化 */
+#processedAudio audio {
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+    display: block;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(6px);
+    box-shadow:
+        inset 0 0 6px rgba(255, 255, 255, 0.3),
+        0 4px 8px rgba(200, 200, 200, 0.2);
+}
+
+/* 按钮美化 */
+#processedResults button {
+    font-family: 'PencilPete', sans-serif;
+    font-weight: bold; /* 让浏览器伪加粗一点点 */
+    font-size: 20px;
+    padding: 12px 20px;
+    background: rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(255, 200, 255, 0.3);
+    box-shadow:
+        inset 0 0 8px rgba(255, 255, 255, 0.4),
+        0 4px 12px rgba(200, 200, 200, 0.2);
+    border-radius: 30px;
+    color: #444;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(8px);
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 20px;
+}
+
+#processedResults button:hover {
+    background: rgba(255, 255, 255, 0.7);
+    transform: scale(1.05);
+    box-shadow:
+        0 0 0 2px rgba(255, 160, 220, 0.2),
+        0 6px 16px rgba(255, 200, 240, 0.2);
+}
+
+/* 🌸 收集的 Dreams 小卡片基础样式 */
+.dream-card {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(6px);
+    border-radius: 20px;
+    padding: 16px;
+    margin: 10px 0;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    text-align: center;
+    font-family: 'PencilPete', sans-serif;
+    font-weight: bold;
+}
+
+/* 🌸 收集的 Dreams 小卡片基础样式 */
+.dream-card {
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(6px);
+    border-radius: 16px;
+    padding: 12px;
+    margin: 8px 0;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    text-align: center;
+    font-family: 'PencilPete', sans-serif;
+    font-weight: bold;
+    font-size: 16px; /* 默认就小一点 */
+}
+
+/* 卡片内的音频播放器基础样式 */
+.dream-card audio {
+    width: 180px; /* ✨播放器整体缩小 */
+    height: 32px; /* ✨固定高度，不要太高 */
+    margin-top: 6px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.5);
+    backdrop-filter: blur(6px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+
+/* 📱 更小屏幕比如 iPhone SE 专属更小更紧凑 */
+@media (max-width: 375px) {
+    .dream-card {
+        padding: 8px;
+        margin: 6px 0;
+        border-radius: 14px;
+        font-size: 13px; /* ✨ 更小文字 */
+    }
+
+    .dream-card div {
+        font-size: 13px; /* ✨ 卡片内文本更小 */
+        margin-bottom: 4px;
+    }
+
+    .dream-card audio {
+        width: 80px; /* ✨ 再缩小一点 */
+        height: 28px;
+        margin-top: 4px;
+    }
+}
+
+
+/* 📱 移动端适配 */
+/* 📱 iPhone SE / 超小手机专属适配 */
+@media (max-width: 375px) {
+    #processedResults {
+        padding: 16px 10px;
+        margin-top: 20px;
+        border-radius: 20px;
+        max-width: 90%;
+    }
+
+    #processedText {
+        font-size: clamp(14px, 4vw, 22px);
+        margin-bottom: 20px;
+    }
+
+    #processedAudio {
+        margin-bottom: 16px;
+    }
+
+    #processedAudio audio {
+        width: 100%;
+        max-width: 280px;
+        border-radius: 16px;
+    }
+
+    #processedResults button {
+        font-size: 16px;
+        padding: 8px 12px;
+        width: 90%;
+        max-width: 260px;
+        border-radius: 24px;
+        margin-top: 16px;
+    }
+}

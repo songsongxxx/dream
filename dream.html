@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>dream</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <!-- 🏛️ 中文：复古像素风 -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="dreamstyle.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/loaders/GLTFLoader.js"></script> <!-- GLTF 加载器 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/loaders/GLTFLoader.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <link rel="icon" href="data:,">
+
+
+</head>
+
+
+<body>
+    <!-- 🌟 导航栏 -->
+    <div class="navbar">
+       <!-- <a href="index.html">index</a>
+        <a href="dream.html">dream</a>
+        <a href="qq_space.html">qq space</a>
+        <a href="Daydream.html">daydream chat</a>
+            <a href="audrey_home.html">audrey's home</a>
+        <a href="george_home.html">george's home</a>
+        <a href="yewen_home.html">yewen's Home</a> -->
+    </div>
+
+
+    <!-- 📝 交互控件 -->
+    <div id="controls">
+        <input type="text" id="bubbleText" placeholder="Dream input">
+        <button id="bubbleBtn">Generate Bubble</button>
+        <button id="recordBtn">Start Recording</button>
+        <button id="stopRecordBtn">Stop Recording</button>
+        <button id="testToneBtn"></button>
+
+    </div>
+
+    <div id="processor-section">
+        <button id="mergeDreamsBtn">Merge Dreams</button> <!-- This button is below the input controls -->
+    </div>
+
+
+
+    <div id="bubbleContainer"></div>
+    <div id="junkyard"></div> <!-- 底部的“电子垃圾” -->
+
+    <!-- toneControls -->
+    <div id="toneControls">
+        <label>（Pitch）: <input type="range" id="pitchSlider" min="-24" max="24" value="0"></label><br>
+        <label>（Reverb）: <input type="range" id="reverbSlider" min="1" max="10" step="0.1" value="4"></label><br>
+        <label>（BitDepth）: <input type="range" id="bitSlider" min="2" max="8" value="4"></label><br>
+        <label>（Delay）: <input type="range" id="delaySlider" min="0" max="1" step="0.05" value="0.3"></label><br>
+        <label>（Volume）:
+            <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.8">
+          </label><br>
+  
+    </div>
+
+    <script>
+
+
+        </script>
+
+    <!-- 🎵 加载 dreamscript.js 并正确绑定函数 -->
+    <script type="module">
+        import {
+            createBubble,
+            startRecording,
+            stopRecording,
+            saveBubbleToSupabase,
+            loadBubbles
+        } from "./dreamscript.js";
+
+        document.addEventListener("DOMContentLoaded", () => {
+        console.log("✅ 页面加载完成，绑定事件");
+
+        loadBubbles(); // 只调用这句就够了！
+
+        const bubbleTextInput = document.getElementById("bubbleText");
+        const bubbleBtn = document.getElementById("bubbleBtn");
+        const recordBtn = document.getElementById("recordBtn");
+        const stopRecordBtn = document.getElementById("stopRecordBtn");
+        const testToneBtn = document.getElementById("testToneBtn");
+
+        if (!bubbleTextInput || !bubbleBtn || !recordBtn || !stopRecordBtn) {
+            console.error("❌ 绑定事件失败，检查 HTML 是否包含正确的 ID！");
+            return;
+        }
+
+        bubbleBtn.addEventListener("click", async () => {
+            const text = bubbleTextInput.value.trim();
+            if (!text) {
+                console.error("❌ 用户输入为空，不存入 Supabase");
+                return;
+            }
+            console.log("📌 用户输入:", text);
+
+            await saveBubbleToSupabase(text, null);
+            loadBubbles(); // Refresh bubbles from Supabase
+        });
+
+        recordBtn.addEventListener("click", () => {
+            console.log("🎙 开始录音...");
+            startRecording();
+        });
+
+        stopRecordBtn.addEventListener("click", () => {
+            console.log("🛑 停止录音...");
+            stopRecording();
+        });
+
+        testToneBtn.addEventListener("click", async () => {
+            console.log("🔊 试听 Tone 效果");
+            const synth = new Tone.Synth().toDestination();
+            synth.triggerAttackRelease("C4", "1n");
+        });
+        });
+
+
+    </script>
+
+</body>
+
+</html>

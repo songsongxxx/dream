@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dream Clock - Black with Red Glow</title>
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: black;
+  }
+  video {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    object-fit: cover;
+    z-index: 0;
+  }
+  canvas {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: transparent;
+    z-index: 1;
+  }
+</style>
+</head>
+<body>
+
+<!-- 背景视频 -->
+<video autoplay loop muted playsinline id="backgroundVideo">
+  <source src="/dreamimages/Somna Spores.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
+<!-- 画钟表的canvas -->
+<canvas id="clockCanvas" width="512" height="512"></canvas>
+
+<script>
+  const canvas = document.getElementById('clockCanvas');
+  const ctx = canvas.getContext('2d');
+  
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height / 2;
+  const radius = canvas.width * 0.42;
+  
+  let startTime = Date.now();
+  let lastStage = 0;
+  let isShaking = false;
+  let shakeStartTime = 0;
+  
+  function drawClock() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+    const elapsed = Math.max(0, (Date.now() - startTime) / 1000); // 秒
+    const currentStage = Math.floor(elapsed); // 每秒一个阶段（整数秒）
+  
+    // 检查是不是到了新阶段
+    if (currentStage !== lastStage) {
+      lastStage = currentStage;
+      startShake();
+    }
+  
+    // 抖动处理
+    let offsetX = 0;
+    let offsetY = 0;
+    if (isShaking) {
+      const now = Date.now();
+      if (now - shakeStartTime < 200) { // 抖动持续200毫秒
+        offsetX = (Math.random() - 0.5) * 10; // 在-5到+5像素之间
+        offsetY = (Math.random() - 0.5) * 10;
+      } else {
+        isShaking = false;
+      }
+    }
+  
+    ctx.save();
+    ctx.translate(offsetX, offsetY); // 整体抖动
+  
+    // 发光效果随阶段增强（可以调整得更夸张）
+    let dynamicBlur = 15 + currentStage * 10;
+    let dynamicAlpha = Math.min(0.6 + currentStage * 0.1, 1.0);
+    let dynamicColor = `rgba(255, 0, 0, ${dynamicAlpha.toFixed(2)})`;
+  
+    // --- 画表盘圈 ---
+    ctx.save();
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 4;
+    ctx.shadowBlur = dynamicBlur;
+    ctx.shadowColor = dynamicColor;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  
+    // --- 画刻度点 ---
+    ctx.save();
+    for (let i = 0; i < 12; i++) {
+      const angle = (i * 30) * Math.PI / 180;
+      const dotX = centerX + radius * Math.cos(angle);
+      const dotY = centerY + radius * Math.sin(angle);
+  
+      ctx.fillStyle = "black";
+      ctx.shadowBlur = dynamicBlur * 0.7;
+      ctx.shadowColor = dynamicColor;
+      ctx.beginPath();
+      ctx.arc(dotX, dotY, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  
+    // --- 画指针 ---
+    const pointerAngle = (-0.3 * elapsed) * Math.PI / 180 - Math.PI / 2;
+  
+    ctx.save();
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 4;
+    ctx.shadowBlur = dynamicBlur * 0.8;
+    ctx.shadowColor = dynamicColor;
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.lineTo(centerX + radius * Math.cos(pointerAngle), centerY + radius * Math.sin(pointerAngle));
+    ctx.stroke();
+    ctx.restore();
+  
+    ctx.restore(); // 抖动结束
+  
+    requestAnimationFrame(drawClock);
+  }
+  
+  function startShake() {
+    isShaking = true;
+    shakeStartTime = Date.now();
+  }
+  
+  drawClock();
+  </script>
+  
+
+</body>
+</html>

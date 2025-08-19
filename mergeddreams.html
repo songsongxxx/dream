@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Processed Dreams</title>
+    <link rel="stylesheet" href="mergeddreams.css"> <!-- Correct stylesheet -->
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+
+
+</head>
+<body>
+    <div id="processedResults">
+        <h2>Processed Dreams</h2>
+        <div id="processedText"></div> <!-- Display processed text -->
+        <div id="processedAudio"></div> <!-- Display processed audio -->
+
+        <div id="buttonContainer">
+            <button id="collectDreamBtn">Collect Dream</button>
+            <button id="nextDreamBtn">Next Dream</button>
+          </div>
+          
+          <button id="mergeDreamsBtn">Merge Dreams</button>
+          <div id="collectedDreams"></div>
+
+          <!-- 左上角小退出按钮 -->
+<button id="exitButton" style="
+position: fixed;
+top: 10px;
+left: 10px;
+padding: 4px 8px;
+font-size: 10px;
+background: rgba(255, 255, 255, 0.4);
+color: #333;
+border: none;
+border-radius: 5px;
+cursor: pointer;
+opacity: 0.5;
+transition: opacity 0.3s, background 0.3s;
+z-index: 9999;
+">
+✖ Exit
+</button>
+
+<script>
+    // 点击退出按钮，跳转回dream.html
+    document.getElementById('exitButton').addEventListener('click', () => {
+      window.location.href = 'dream.html';
+    });
+    
+    // 鼠标移上去变亮
+    const exitBtn = document.getElementById('exitButton');
+    exitBtn.addEventListener('mouseenter', () => {
+      exitBtn.style.opacity = '1';
+      exitBtn.style.background = 'rgba(255,255,255,0.8)';
+    });
+    exitBtn.addEventListener('mouseleave', () => {
+      exitBtn.style.opacity = '0.5';
+      exitBtn.style.background = 'rgba(255,255,255,0.4)';
+    });
+    </script>
+
+
+<!-- 🌟 新增合成结果区 -->
+<div id="mergedResult" style="margin-top: 50px;"></div>
+
+    </div>
+    
+
+    <script type="module" src="./mergeddreams.js"></script>
+
+</body>
+</html>
