@@ -1,3 +1,35 @@
+@font-face {
+  font-family: 'Dreamer TM';
+  src: url('./dreamimages/Dreamer TM.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'PencilPete';
+  src: url('PencilPete TRIAL/PencilPeteFONT.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'StarryFonts';
+  src: url('https://raw.githubusercontent.com/songsongxxx/qqspace/main/fontsassets/starry_fonts.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Inkdrop';
+  src: url('https://raw.githubusercontent.com/songsongxxx/qqspace/main/fontsassets/inkdrop.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+html, body, * {
+  font-family: 'Dreamer TM', sans-serif !important;
+  letter-spacing: 0.16em;
+}
 #loader {
   position: fixed;
   width: 100%;
@@ -35,12 +67,10 @@
 }
 
 body {
-  font-family: 'PencilPete', sans-serif;
-  font-weight: bold; /* 让浏览器伪加粗一点点 */
-    background-color: #f1f1f1;
-    text-align: center;
-    margin: 0;
-    padding: 0;
+  background-color: #f1f1f1;
+  text-align: center;
+  margin: 0;
+  padding: 0;
 }
 
 #game-container {
@@ -88,24 +118,22 @@ body {
   }
   
 /* 对话文字风格 */
+/* 对话文字风格 */
 #story-text {
-    font-family: 'PencilPete', sans-serif; /* 更有手写感 */
-    font-size: 1rem;
-    background: rgba(255, 255, 255, 0.3); /* 轻透背景 */
-    border: 1px dashed #999; /* ✅ 保留 */
-    border-radius: 12px;
-    padding: 0.7rem;
-    margin-top: 1rem;
-    backdrop-filter: blur(20px);
-    color: #222;
-    box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
-
-    /* ✅ 保证居中 */
-    display: block;
-    max-width: 80%;
-    margin-left: auto;
-    margin-right: auto;
-  }
+  font-size: 1rem;
+  background: rgba(255, 255, 255, 0.3); /* 轻透背景 */
+  border: 1px dashed #999; /* ✅ 保留 */
+  border-radius: 12px;
+  padding: 0.7rem;
+  margin-top: 1rem;
+  backdrop-filter: blur(20px);
+  color: #222;
+  box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+  display: block;
+  max-width: 80%;
+  margin-left: auto;
+  margin-right: auto;
+}
   /* ✅ 平板适配 */
 @media (max-width: 768px) {
     #story-text {
@@ -138,17 +166,15 @@ body {
 
 /* 清除所有 button 的边框和背景 */
 button {
-    border: none;         /* 去掉边框 */
-    background: none;     /* 去掉背景 */
-    box-shadow: none;     /* 去掉阴影 */
-    padding: 0.6rem 1.2rem;
-    margin-top: 1rem;
-    font-family: 'PencilPete', sans-serif;
-    font-weight: bold; /* 让浏览器伪加粗一点点 */
-    font-size: 1rem;
-    color: #333;
-    cursor: pointer;
-    transition: 0.3s ease;
+  border: none;         /* 去掉边框 */
+  background: none;     /* 去掉背景 */
+  box-shadow: none;     /* 去掉阴影 */
+  padding: 0.6rem 1.2rem;
+  margin-top: 1rem;
+  font-size: 1rem;
+  color: #333;
+  cursor: pointer;
+  transition: 0.3s ease;
 }
 
 /* 鼠标悬停时不要出现背景变化 */
