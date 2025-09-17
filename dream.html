@@ -41,6 +41,10 @@
         let chunks = [];
         let testMicStream = null;
 
+        // 全局：当前播放的音频及按钮引用（放在其它全局变量旁边）
+        let currentAudio = null;
+        let currentBtn = null;
+
         function getSupportedMime() {
             const c = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg'];
             for (const mt of c) if (MediaRecorder.isTypeSupported?.(mt)) return mt;
@@ -287,6 +291,16 @@ $('recStop').disabled  = true;
     });
 }
 
+function formatDuration(sec) {
+  if (!isFinite(sec)) return '';
+  const m = Math.floor(sec / 60).toString().padStart(2,'0');
+  const s = Math.floor(sec % 60).toString().padStart(2,'0');
+  return `${m}:${s}`;
+}
+
+const rand = (min, max) => Math.random() * (max - min) + min;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
 function renderRows(rows) {
     const container = document.getElementById('bubbleContainer');
     if (!container) {
@@ -295,29 +309,111 @@ function renderRows(rows) {
     }
     container.innerHTML = '';
 
-    rows.forEach(({ text, timestamp, audioUrl }) => {
-        // 跳过完全空的行（没有文字也没有音频）
+    rows.forEach(({ text, timestamp, audioUrl }, idx) => {
         if (!text && !audioUrl) return;
 
         const wrap = document.createElement('div');
         wrap.className = 'bubble';
+        wrap.style.visibility = 'hidden'; // 先隐藏，测量后再显示
 
-        // 时间 + 文本
+        // 标题/文本 + 时间
         const meta = document.createElement('div');
         const timeStr = timestamp ? new Date(timestamp).toLocaleString() : '';
-        meta.textContent = `${text || ''}${timeStr ? `（${timeStr}）` : ''}`;
+        meta.textContent = `${text || (audioUrl ? '语音消息' : '')}${timeStr ? `（${timeStr}）` : ''}`;
         wrap.appendChild(meta);
 
-        // 音频（只要有链接就渲染）
         if (audioUrl && audioUrl.trim()) {
+            // 隐藏 <audio>，用自定义按钮控制
             const audio = document.createElement('audio');
-            audio.controls = true;
             audio.preload = 'metadata';
-            audio.src = audioUrl.trim(); // 来自后端的 Drive 直链
+            audio.src = audioUrl.trim();
+            audio.style.display = 'none';
+
+            const btn = document.createElement('button');
+            btn.className = 'audio-btn';
+            btn.textContent = '▶ 播放';
+
+            const dur = document.createElement('span');
+            dur.style.marginLeft = '8px';
+            dur.textContent = '';
+
+            audio.addEventListener('loadedmetadata', () => {
+                dur.textContent = formatDuration(audio.duration);
+            });
+
+            audio.addEventListener('ended', () => {
+                if (currentAudio === audio) {
+                    btn.textContent = '▶ 播放';
+                    currentAudio = null;
+                    currentBtn = null;
+                }
+            });
+
+            btn.addEventListener('click', async () => {
+                if (currentAudio && currentAudio !== audio) {
+                    currentAudio.pause();
+                    if (currentBtn) currentBtn.textContent = '▶ 播放';
+                }
+                if (audio.paused) {
+                    try {
+                        await audio.play();
+                        btn.textContent = '⏸ 暂停';
+                        currentAudio = audio;
+                        currentBtn = btn;
+                    } catch (e) {
+                        console.error('❌ 无法播放音频：', e);
+                        alert('无法播放音频，请检查网络或文件权限');
+                    }
+                } else {
+                    audio.pause();
+                    btn.textContent = '▶ 播放';
+                    if (currentAudio === audio) {
+                        currentAudio = null;
+                        currentBtn = null;
+                    }
+                }
+            });
+
+            wrap.appendChild(btn);
+            wrap.appendChild(dur);
             wrap.appendChild(audio);
         }
 
+        // 先挂到容器，测量尺寸
         container.appendChild(wrap);
+
+        // 在下一帧设置随机运动参数并开启动画
+        requestAnimationFrame(() => {
+            const cw = container.clientWidth;
+            const ch = container.clientHeight || window.innerHeight * 0.6;
+
+            const bw = wrap.offsetWidth;
+            const bh = wrap.offsetHeight;
+
+            const x0 = rand(0, Math.max(0, cw - bw));
+            const y0 = rand(0, Math.max(0, ch - bh));
+
+            const x1 = clamp(x0 + rand(-140, 140), 0, Math.max(0, cw - bw));
+            const y1 = clamp(y0 + rand(-100, 100), 0, Math.max(0, ch - bh));
+
+            wrap.style.left = `${x0}px`;
+            wrap.style.top  = `${y0}px`;
+
+            wrap.style.setProperty('--x0', `${x0}px`);
+            wrap.style.setProperty('--x1', `${x1}px`);
+            wrap.style.setProperty('--y0', `${y0}px`);
+            wrap.style.setProperty('--y1', `${y1}px`);
+
+            // 随机时长与相位
+            wrap.style.setProperty('--dur-x', `${rand(10,16).toFixed(2)}s`);
+            wrap.style.setProperty('--dur-y', `${rand(8,14).toFixed(2)}s`);
+            wrap.style.setProperty('--delay-x', `${rand(-6,0).toFixed(2)}s`);
+            wrap.style.setProperty('--delay-y', `${rand(-6,0).toFixed(2)}s`);
+
+            wrap.style.zIndex = 10 + idx; // 轻微分层
+            wrap.classList.add('float');
+            wrap.style.visibility = 'visible';
+        });
     });
 }
 
@@ -333,20 +429,16 @@ function renderRows(rows) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+    console.log("✅ 页面加载完成，绑定事件");
+
     checkMicPermissions();
     listMics(); // 加载麦克风列表
-});
-
-        document.addEventListener("DOMContentLoaded", () => {
-    console.log("✅ 页面加载完成，绑定事件");
+    loadFromGAS().catch(err => console.error('❌ 初始加载失败:', err));
 
     const recStart = document.getElementById("recStart");
     const recStop = document.getElementById("recStop");
     const testMicBtn = document.getElementById("testMic");
     const generateBubble = document.getElementById("generateBubble");
-
-    // 页面加载时加载现有数据
-    loadFromGAS().catch(err => console.error('❌ 初始加载失败:', err));
 
     recStart.addEventListener('click', startRec);
 
@@ -356,15 +448,14 @@ document.addEventListener("DOMContentLoaded", () => {
             alert('录音为空或失败，请重试');
             return;
         }
-
-        const dataURL = await blobToDataURL(blob); // 将 Blob 转换为 Base64
+        const dataURL = await blobToDataURL(blob);
         const mime = blob.type || 'audio/webm';
         const name = `recording_${Date.now()}.${mime.includes('ogg') ? 'ogg' : 'webm'}`;
         const text = (document.getElementById("bubbleText").value || '').trim();
 
         await submitToGAS({ text, audioB64: dataURL, audioMime: mime, filename: name });
-        document.getElementById("bubbleText").value = ''; // 清空输入框
-        await loadFromGAS(); // 提交后刷新
+        document.getElementById("bubbleText").value = '';
+        await loadFromGAS();
     });
 
     testMicBtn.addEventListener('click', testMic);
@@ -374,10 +465,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!text) return;
         await submitTextToGAS(text);
         document.getElementById("bubbleText").value = '';
-        await loadFromGAS(); // 提交后刷新
+        await loadFromGAS();
     });
-
-    listMics(); // 加载麦克风列表
 });
 
     </script>

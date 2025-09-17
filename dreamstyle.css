@@ -176,6 +176,50 @@ margin-bottom: 14px;
     color: rgb(160, 159, 179);
 }
 
+/* 浮动气泡容器 */
+#bubbleContainer {
+  position: relative;
+  min-height: 60vh;
+  padding: 8px;
+  overflow: hidden;
+}
+
+/* 气泡样式（文本/语音通用） */
+.bubble {
+  position: absolute;
+  max-width: 60ch;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.9);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+  border: 1px solid rgba(0,0,0,0.06);
+  user-select: none;
+}
+
+/* 音频播放按钮 */
+.audio-btn {
+  margin-top: 6px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+  background: #f7f7f7;
+  cursor: pointer;
+}
+
+/* 漂浮动画：分别动画 left/top，避免 transform 覆盖 */
+@keyframes floatX {
+  from { left: var(--x0); }
+  to   { left: var(--x1); }
+}
+@keyframes floatY {
+  from { top: var(--y0); }
+  to   { top: var(--y1); }
+}
+.bubble.float {
+  animation:
+    floatX var(--dur-x, 12s) ease-in-out var(--delay-x, 0s) infinite alternate,
+    floatY var(--dur-y, 10s) ease-in-out var(--delay-y, 0s) infinite alternate;
+}
 
 /* 导航栏 */
 .navbar {
