@@ -79,6 +79,51 @@
             loadBubbles
         } from "./dreamscript.js";
 
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzpVE9X5ER9qVzzqOZ_YGwSH6rmVASPqNHLq8IVggKXZ2spaFpJ-AF5GVDv-GWlBQik/exec"; // ← 替换
+        async function saveBubbleToSupabase(text, audio) {
+            const scriptUrl = "https://script.google.com/macros/s/AKfycbzpVE9X5ER9qVzzqOZ_YGwSH6rmVASPqNHLq8IVggKXZ2spaFpJ-AF5GVDv-GWlBQik/exec"; // 替换为你的 Web 应用 URL
+            try {
+                const response = await fetch(scriptUrl, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ text }),
+                });
+                if (response.ok) {
+                    console.log("✅ 数据已成功存储到 Google Sheets");
+                } else {
+                    console.error("❌ 存储失败", response.statusText);
+                }
+            } catch (error) {
+                console.error("❌ 请求失败", error);
+            }
+        }
+
+        async function loadTextFromGoogle() {
+    try {
+      const res = await fetch(WEB_APP_URL);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Unknown error');
+
+      const container = document.getElementById("bubbleContainer");
+      container.innerHTML = "";
+
+      data.rows.forEach(({ text, timestamp }) => {
+        // 用你自己的 UI 渲染。这里给一个最简示例：
+        const el = document.createElement('div');
+        el.className = 'bubble';              // 你的 CSS 可控制外观
+        el.textContent = text;
+        el.title = new Date(timestamp).toLocaleString();
+        container.appendChild(el);
+
+        // 或者：如果你已有 createBubble(text)
+        // createBubble(text);
+      });
+    } catch (err) {
+      console.error("❌ 加载失败：", err);
+    }
+  }
         document.addEventListener("DOMContentLoaded", () => {
         console.log("✅ 页面加载完成，绑定事件");
 
