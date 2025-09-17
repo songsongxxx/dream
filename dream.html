@@ -17,78 +17,369 @@
     <!-- 🌟 导航栏 -->
     <div class="navbar"></div>
 
-    <!-- 📝 交互控件 -->
+    <!-- 📝 控件 -->
     <div id="controls">
-        <input type="text" id="bubbleText" placeholder="Dream input">
-        <button id="bubbleBtn">Generate Bubble</button>
+        <input type="text" id="bubbleText" placeholder="Enter text for bubble">
+        <button id="generateBubble">Generate Bubble</button>
+        <button id="recStart">Start Rec</button>
+        <button id="recStop" disabled>Stop Rec</button>
+        <button id="testMic">Test Mic</button>
+        <audio id="micMonitor" controls style="display:none; width:280px; margin:8px 0 0 8px"></audio>
+
     </div>
 
     <div id="bubbleContainer"></div>
 
+    
     <script>
-        const WEB_APP_URL = "YOUR_GOOGLE_APPS_SCRIPT_URL"; // 替换为你的 Google Apps Script 部署 URL
+        const $ = (id) => document.getElementById(id);
 
-        // 保存用户输入到 Google Sheets
-        async function saveTextToGoogleSheets(text) {
-            try {
-                const response = await fetch(WEB_APP_URL, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({ text }),
-                });
-                if (response.ok) {
-                    console.log("✅ 数据已成功存储到 Google Sheets");
-                } else {
-                    console.error("❌ 存储失败", response.statusText);
-                }
-            } catch (error) {
-                console.error("❌ 请求失败", error);
-            }
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwURjebFKvxEv4R73B9psje80iN6FB8FBbtSa7cXElGEP1P9wBWIaNdOEgTFvxsqT5x/exec";
+
+        // ====== 录音逻辑（MediaRecorder） ======
+        let mediaRecorder = null;
+        let chunks = [];
+        let testMicStream = null;
+
+        function getSupportedMime() {
+            const c = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg'];
+            for (const mt of c) if (MediaRecorder.isTypeSupported?.(mt)) return mt;
+            return 'audio/webm';
         }
 
-        // 从 Google Sheets 加载数据
-        async function loadTextFromGoogleSheets() {
+        async function listMics() {
+            const devSel = document.getElementById('micSelect') || document.createElement('select');
+            devSel.id = 'micSelect';
+            devSel.innerHTML = ''; // 清空之前的选项
+            document.getElementById('controls').appendChild(devSel);
+
             try {
-                const response = await fetch(WEB_APP_URL);
-                const data = await response.json();
-                const container = document.getElementById("bubbleContainer");
-                container.innerHTML = "";
-
-                data.forEach(({ text, timestamp }) => {
-                    const el = document.createElement("div");
-                    el.className = "bubble";
-                    el.textContent = `${text} (时间: ${new Date(timestamp).toLocaleString()})`;
-                    container.appendChild(el);
-                });
-
-                console.log("✅ 数据已成功加载");
-            } catch (error) {
-                console.error("❌ 加载失败", error);
-            }
-        }
-
-        document.addEventListener("DOMContentLoaded", () => {
-            console.log("✅ 页面加载完成，绑定事件");
-
-            const bubbleTextInput = document.getElementById("bubbleText");
-            const bubbleBtn = document.getElementById("bubbleBtn");
-
-            bubbleBtn.addEventListener("click", async () => {
-                const text = bubbleTextInput.value.trim();
-                if (!text) {
-                    console.error("❌ 用户输入为空");
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const mics = devices.filter(d => d.kind === 'audioinput');
+                if (mics.length === 0) {
+                    console.warn('⚠️ 未检测到麦克风设备');
+                    alert('未检测到麦克风设备，请检查设备连接');
                     return;
                 }
-                console.log("📌 用户输入:", text);
 
-                await saveTextToGoogleSheets(text);
-                loadTextFromGoogleSheets(); // 刷新显示
+                mics.forEach((d, index) => {
+                    const opt = document.createElement('option');
+                    opt.value = d.deviceId;
+                    opt.textContent = d.label || `麦克风 ${index + 1}`;
+                    devSel.appendChild(opt);
+                });
+
+                console.log('✅ 麦克风设备已加载:', mics);
+            } catch (err) {
+                console.error('❌ 无法加载麦克风设备:', err);
+            }
+        }
+
+        async function unlockAudioContext() {
+            if (window.Tone && Tone.context && Tone.context.state !== 'running') {
+                try {
+                    await Tone.start();
+                    console.log('✅ AudioContext unlocked');
+                } catch (e) {
+                    console.warn('⚠️ AudioContext 解锁失败:', e);
+                }
+            }
+        }
+
+        async function startRec() {
+            const deviceId = document.getElementById('micSelect')?.value;
+            if (!deviceId) {
+                alert('请选择一个麦克风设备');
+                return;
+            }
+
+            // 解锁 AudioContext
+            await unlockAudioContext();
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        deviceId: { exact: deviceId },
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                        channelCount: 1
+                    }
+                });
+
+                const mimeType = getSupportedMime();
+                chunks = [];
+                mediaRecorder = new MediaRecorder(stream, { mimeType });
+
+                mediaRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+                mediaRecorder.start();
+                console.log('🎙️ 开始录音...', mimeType);
+                recStart.disabled = true;
+                recStop.disabled = false;
+            } catch (err) {
+                console.error('❌ 无法启动录音:', err);
+                alert('无法启动录音，请检查麦克风设备或权限');
+            }
+            // startRec 末尾：
+$('recStart').disabled = true;
+$('recStop').disabled  = false;
+
+        }
+
+        async function stopRec() {
+            if (!mediaRecorder || mediaRecorder.state === 'inactive') return null;
+
+            const stopped = new Promise(resolve => mediaRecorder.addEventListener('stop', resolve, { once: true }));
+
+            try { mediaRecorder.requestData(); } catch (_) { }
+            mediaRecorder.stop();
+            await stopped;
+
+            const type = mediaRecorder.mimeType || 'audio/webm';
+            const blob = new Blob(chunks, { type });
+
+            console.log('🛑 停止录音，片段数量：', chunks.length);
+            console.log('🎙️ Blob 大小：', blob.size, 'bytes');
+            console.log('🎙️ Blob 类型：', blob.type);
+
+            if (chunks.length === 0 || blob.size === 0) {
+                console.error('❌ 录音数据为空或损坏');
+                return null;
+            }
+
+            chunks = [];
+            recStart.disabled = false;
+            recStop.disabled = true;
+
+            return blob;
+
+            // stopRec 里：
+$('recStart').disabled = false;
+$('recStop').disabled  = true;
+
+        }
+
+        function blobToDataURL(blob) {
+            return new Promise((res, rej) => {
+                const fr = new FileReader();
+                fr.onload = () => res(fr.result);
+                fr.onerror = rej;
+                fr.readAsDataURL(blob);
             });
+        }
 
-            loadTextFromGoogleSheets(); // 页面加载时加载数据
+        // ====== 测试话筒功能 ======
+        async function testMic() {
+    const deviceId = document.getElementById('micSelect')?.value;
+    if (!deviceId) {
+        alert('请选择一个麦克风设备');
+        return;
+    }
+
+    // 解锁 AudioContext
+    await unlockAudioContext();
+
+    // 停止当前的麦克风测试流
+    if (testMicStream) {
+        testMicStream.getTracks().forEach(track => track.stop());
+        testMicStream = null;
+        console.log('🛑 停止话筒测试');
+        return;
+    }
+
+    try {
+        // 获取麦克风音频流
+        testMicStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                deviceId: { exact: deviceId }
+            }
         });
+
+        // 绑定到页面上的 <audio> 元素
+        const micMonitor = document.getElementById('micMonitor');
+        micMonitor.style.display = 'block'; // 显示音频控件
+        micMonitor.srcObject = testMicStream;
+        micMonitor.onloadedmetadata = () => {
+            micMonitor.play().then(() => {
+                console.log('🎤 开始话筒测试');
+            }).catch(err => {
+                console.error('❌ 无法播放音频流:', err);
+                alert('无法播放音频流，请检查麦克风设备或权限');
+            });
+        };
+    } catch (err) {
+        console.error('❌ 无法测试话筒:', err);
+        alert('无法测试话筒，请检查麦克风设备或权限');
+    }
+}
+
+        // ====== 表单提交：支持文字上传 ======
+        async function submitTextToGAS(text) {
+            if (!text) return;
+            await postViaHiddenForm(WEB_APP_URL, { text });
+        }
+
+        async function submitToGAS({ text = '', audioB64 = '', audioMime = '', filename = '' }) {
+            await postViaHiddenForm(WEB_APP_URL, {
+                text,
+                audio_b64: audioB64,   // Base64 数据
+                audio_mime: audioMime, // 音频 MIME 类型
+                filename               // 文件名
+            });
+        }
+
+        function postViaHiddenForm(url, fields) {
+            return new Promise((resolve) => {
+                // 创建唯一的 iframe，避免多次提交时冲突
+                const iframeName = 'gas_iframe_' + Date.now();
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.name = iframeName;
+                document.body.appendChild(iframe);
+
+                // 创建隐藏表单
+                const form = document.createElement('form');
+                form.action = url + '?_=' + Date.now(); // 防止缓存
+                form.method = 'POST';
+                form.target = iframeName;
+
+                // 添加表单字段
+                Object.entries(fields || {}).forEach(([key, value]) => {
+                    if (value == null) return;
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = key;
+                    input.value = String(value);
+                    form.appendChild(input);
+                });
+
+                document.body.appendChild(form);
+
+                // 监听 iframe 的加载事件
+                iframe.addEventListener('load', () => {
+                    form.remove();
+                    setTimeout(() => iframe.remove(), 50);
+                    resolve(true);
+                }, { once: true });
+
+                // 提交表单
+                form.submit();
+            });
+        }
+
+        // ====== 读取（JSONP）并渲染 ======
+        function loadFromGAS() {
+    return new Promise((resolve, reject) => {
+        window.receiveRows = (data) => {
+            try {
+                if (!data || !data.ok) throw new Error(data && data.error || 'unknown');
+                renderRows(Array.isArray(data.rows) ? data.rows : []);
+                resolve(true);
+            } catch (e) {
+                console.error('❌ 数据解析失败：', e);
+                reject(e);
+            }
+        };
+        const s = document.createElement('script');
+        s.src = `${WEB_APP_URL}?callback=receiveRows&_=${Date.now()}`;
+        s.onerror = (e) => { console.error('❌ JSONP 加载失败', e); reject(e); };
+        document.body.appendChild(s);
+    });
+}
+
+function renderRows(rows) {
+    const container = document.getElementById('bubbleContainer');
+    if (!container) {
+        console.error('❌ 缺少 #bubbleContainer 容器');
+        return;
+    }
+    container.innerHTML = '';
+
+    rows.forEach(({ text, timestamp, audioUrl }) => {
+        // 跳过完全空的行（没有文字也没有音频）
+        if (!text && !audioUrl) return;
+
+        const wrap = document.createElement('div');
+        wrap.className = 'bubble';
+
+        // 时间 + 文本
+        const meta = document.createElement('div');
+        const timeStr = timestamp ? new Date(timestamp).toLocaleString() : '';
+        meta.textContent = `${text || ''}${timeStr ? `（${timeStr}）` : ''}`;
+        wrap.appendChild(meta);
+
+        // 音频（只要有链接就渲染）
+        if (audioUrl && audioUrl.trim()) {
+            const audio = document.createElement('audio');
+            audio.controls = true;
+            audio.preload = 'metadata';
+            audio.src = audioUrl.trim(); // 来自后端的 Drive 直链
+            wrap.appendChild(audio);
+        }
+
+        container.appendChild(wrap);
+    });
+}
+
+        // ====== 事件绑定 ======
+        async function checkMicPermissions() {
+    try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log('✅ 麦克风权限已授予');
+    } catch (err) {
+        console.error('❌ 无法访问麦克风，请检查权限:', err);
+        alert('无法访问麦克风，请检查浏览器权限设置');
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    checkMicPermissions();
+    listMics(); // 加载麦克风列表
+});
+
+        document.addEventListener("DOMContentLoaded", () => {
+    console.log("✅ 页面加载完成，绑定事件");
+
+    const recStart = document.getElementById("recStart");
+    const recStop = document.getElementById("recStop");
+    const testMicBtn = document.getElementById("testMic");
+    const generateBubble = document.getElementById("generateBubble");
+
+    // 页面加载时加载现有数据
+    loadFromGAS().catch(err => console.error('❌ 初始加载失败:', err));
+
+    recStart.addEventListener('click', startRec);
+
+    recStop.addEventListener('click', async () => {
+        const blob = await stopRec();
+        if (!blob || !(blob instanceof Blob) || blob.size === 0) {
+            alert('录音为空或失败，请重试');
+            return;
+        }
+
+        const dataURL = await blobToDataURL(blob); // 将 Blob 转换为 Base64
+        const mime = blob.type || 'audio/webm';
+        const name = `recording_${Date.now()}.${mime.includes('ogg') ? 'ogg' : 'webm'}`;
+        const text = (document.getElementById("bubbleText").value || '').trim();
+
+        await submitToGAS({ text, audioB64: dataURL, audioMime: mime, filename: name });
+        document.getElementById("bubbleText").value = ''; // 清空输入框
+        await loadFromGAS(); // 提交后刷新
+    });
+
+    testMicBtn.addEventListener('click', testMic);
+
+    generateBubble.addEventListener('click', async () => {
+        const text = document.getElementById("bubbleText").value.trim();
+        if (!text) return;
+        await submitTextToGAS(text);
+        document.getElementById("bubbleText").value = '';
+        await loadFromGAS(); // 提交后刷新
+    });
+
+    listMics(); // 加载麦克风列表
+});
+
     </script>
 </body>
 
