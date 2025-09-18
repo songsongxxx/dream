@@ -32,171 +32,113 @@ body, html, * {
   font-style: normal;
 }
 
-
-body {
-  font-family: 'PencilPete', sans-serif;
-  font-weight: bold; /* 让浏览器伪加粗一点点 */
-    text-align: center;
-    background-color: #fefefe;
-    margin: 0;
-    height: auto; /* ✅ 不要 height: 100vh，改成自动适应内容 */
-    min-height: 100vh; /* ✅ 保底是满屏，不小于1屏 */
-    overflow-x: hidden; /* ✅ 横向禁止滚动，纵向可以滚 */
+/* 全局基础 */
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  min-height: 100vh;
+  background: #fefefe;
+  color: #1b1b1b;
+  font-family: system-ui, "Noto Sans SC", Arial, sans-serif;
+  text-align: center;
+  overflow-x: hidden;
 }
 
+/* 顶部导航（占位，避免遮挡） */
+.navbar {
+  position: fixed;
+  top: 0; left: 0; width: 100%;
+  height: 48px;
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  z-index: 1000;
+}
 
-#toneControls {
-  position: relative;
-  margin-top: 400px; /* ✨距离上方留出空间 */
+/* 控件区（按钮/输入） */
+#controls {
+  position: fixed;
+  top: 25%;
   left: 50%;
-  top: auto;
-  transform: none;
-    width: 200px;
-    background: white;
-    border-radius: 50px;
-    padding: 16px 20px;
-    box-shadow:
-        0 8px 20px rgba(0, 0, 0, 0.1),
-        inset 0 0 12px rgba(255, 255, 255, 0.6),
-        0 0 30px rgba(255, 255, 255, 0.5);
-    font-family: 'PencilPete', sans-serif;
-    font-weight: bold; /* 让浏览器伪加粗一点点 */
-    font-size: 14px;
-    color: #333;
-    z-index: 10;
-    animation: fluffyBounce 2s infinite ease-in-out;
-    backdrop-filter: blur(6px);
-    border: 2px solid rgba(255, 255, 255, 0.5);
-    transition: all 0.3s ease;
+  transform: translate(-50%, -50%);
+  background: rgba(255,255,255,0.2);
+  backdrop-filter: blur(10px);
+  padding: 14px 18px;
+  border-radius: 16px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+  z-index: 900;
+}
+#controls input[type="text"],
+#controls button {
+  font-size: 16px;
+  height: 40px;
+  padding: 8px 14px;
+  border-radius: 22px;
+  border: 1px solid rgba(200,200,200,0.5);
+  background: rgba(255,255,255,0.6);
+  color: #444;
+  transition: .2s ease;
+}
+#controls button { cursor: pointer; }
+#controls button:hover {
+  transform: scale(1.02);
+  background: rgba(255,255,255,0.75);
 }
 
-#toneControls label {
-    display: block;
-margin-bottom: 14px;
-    font-size: 18px;
-    color: #444;
+/* 语音参数区 */
+.voice-controls {
+  margin: 60px auto 8px;
+  display: grid;
+  gap: 8px;
+  max-width: 720px;
+  padding-top: 48px; /* 避开导航 */
+}
+.vc-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.vc-label { width: 100px; text-align: right; }
+
+/* 麦克风监听：默认隐藏，由 JS 控制显示 */
+#micMonitor {
+  display: none;
+  width: 280px;
+  margin: 8px auto 0;
 }
 
-#toneControls input[type="range"] {
-    width: 100%;
-    appearance: none;
-    background: #ffeefc;
-    height: 8px;
-    border-radius: 20px;
-    outline: none;
-    margin-top: 6px;
-    margin-bottom: 12px;
-    box-shadow: inset 0 0 4px rgba(255, 153, 204, 0.3);
-}
-
-#toneControls input[type="range"]::-webkit-slider-thumb {
-    appearance: none;
-    width: 16px;
-    height: 16px;
-    background: #ffb6f2;
-    border-radius: 50%;
-    cursor: pointer;
-    box-shadow:
-        0 0 6px #ff8bd8,
-        0 0 12px #fff inset;
-    transition: transform 0.2s ease;
-}
-
-#toneControls input[type="range"]::-webkit-slider-thumb:hover {
-    transform: scale(1.2);
-}
-
-/* 毛茸茸的跳动动画 */
-@keyframes fluffyBounce {
-
-    0%,
-    100% {
-        transform: translateX(-50%) scale(1);
-    }
-
-    50% {
-        transform: translateX(-50%) scale(1.05);
-    }
-}
-
-
-#toneControls:hover {
-    background: rgba(197, 212, 224, 0.85);
-    transition: 0.3s;
-}
-
-/* 保证浮层层级 */
-.navbar,
-#controls,
-#toneControls {
-    z-index: 1000;
-    position: relative;
-}
-
-
-/* 泡泡样式 */
-.bubble {
-    position: absolute;
-    background-color: rgba(240, 251, 255, 0.6); /* ✨ 把原来的 #f0fbff 换成半透明 */
-    /*background-color: #f0fbff;*/
-    color: rgb(27, 27, 27);
-    padding: 10px 15px;
-    border-radius: 50%;
-    text-align: center;
-    font-size: clamp(4px, 1.5vw, 15px);
-    display: flex;
-    border-radius: 30px; /* 稍微圆润一些更柔和 */
-    align-items: center;
-    justify-content: center;
-    box-shadow: 4px 4px 0px #383838;
-    border: 2px solid #000;
-    cursor: pointer;
-    pointer-events: auto;
-
-    word-break: break-word;
-    overflow-wrap: break-word;
-
-    max-width: 180px; /* 限制最大宽度 */
-    word-wrap: break-word; /* 允许单词内换行 */
-    white-space: normal; /* 正常换行 */
-}
-
-/* 图片泡泡 */
-.bubble img {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-}
-
-/* 鼠标悬停 */
-.bubble:hover {
-    transform: scale(2.15);
-    box-shadow: 5px 5px 0px #666;
-    background: #626592;
-    color: rgb(160, 159, 179);
-}
-
-/* 浮动气泡容器 */
+/* 气泡容器与气泡 */
 #bubbleContainer {
   position: relative;
   min-height: 60vh;
   padding: 8px;
+  margin-top: 120px; /* 给上方控件留空间 */
   overflow: hidden;
 }
 
-/* 气泡样式（文本/语音通用） */
 .bubble {
   position: absolute;
   max-width: 60ch;
   padding: 10px 12px;
   border-radius: 14px;
   background: rgba(255,255,255,0.9);
+  color: #1b1b1b;
   box-shadow: 0 6px 18px rgba(0,0,0,0.12);
   border: 1px solid rgba(0,0,0,0.06);
   user-select: none;
+  pointer-events: auto;
+  font-size: 14px;
+}
+.bubble:hover {
+  transform: scale(1.06);
 }
 
-/* 音频播放按钮 */
+/* 音频播放按钮（泡泡内） */
 .audio-btn {
   margin-top: 6px;
   padding: 6px 10px;
@@ -206,384 +148,28 @@ margin-bottom: 14px;
   cursor: pointer;
 }
 
-/* 漂浮动画：分别动画 left/top，避免 transform 覆盖 */
-@keyframes floatX {
-  from { left: var(--x0); }
-  to   { left: var(--x1); }
-}
-@keyframes floatY {
-  from { top: var(--y0); }
-  to   { top: var(--y1); }
-}
+/* 漂浮动画（left/top 分离，避免覆盖 transform） */
+@keyframes floatX { from { left: var(--x0); } to { left: var(--x1); } }
+@keyframes floatY { from { top: var(--y0); } to { top: var(--y1); } }
 .bubble.float {
   animation:
     floatX var(--dur-x, 12s) ease-in-out var(--delay-x, 0s) infinite alternate,
     floatY var(--dur-y, 10s) ease-in-out var(--delay-y, 0s) infinite alternate;
 }
 
-/* 导航栏 */
-.navbar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    backdrop-filter: blur(10px);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-wrap: wrap;
-    /* 在屏幕太小的情况下，超出的部分会换行 */
-    padding: 10px 0;
-    z-index: 100;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-    font-size: clamp(12px, 1.5vw, 18px);
-    /* 让字体根据屏幕大小自适应 */
-}
-
-.navbar a {
-    color: rgb(228, 226, 226);
-    text-decoration: none;
-    padding: clamp(6px, 1vw, 12px) clamp(8px, 1.5vw, 16px);
-    /* 自适应 padding */
-    font-size: clamp(12px, 1.5vw, 18px);
-    font-weight: 500;
-    transition: 0.3s;
-}
-  
-  body {
-    touch-action: manipulation;
-  }
-  
-  
-  /* 🌟 控制面板 #controls（现在在导航栏下方） */
-#controls {
-  position: fixed;
-  /* 让它位于导航栏下方 */
-  top: 25%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(10px);
-  padding: clamp(10px, 2vw, 20px);
-  border-radius: 15px;
-  display: flex;
-  justify-content: center; /* Horizontally center text */
-  align-items: center; /* Vertically center text */
-  text-align: center; /* Center text within the button */
-  gap: 10px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-}
-
-#processor-section {
-  display: flex;
-  justify-content: center;
-  margin-top: 20px;
-  padding-bottom: 10px;
-  font-family: 'PencilPete', sans-serif;
-  font-weight: bold; /* 让浏览器伪加粗一点点 */
-}
-
-#mergeDreamsBtn {
-  font-family: 'PencilPete', sans-serif;
-  font-weight: bold; /* 让浏览器伪加粗一点点 */
-  font-size: 22px;
-  padding: 12px 20px;
-  height: 48px;
-  border-radius: 30px;
-  width: auto;
-  max-width: 300px;
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(255, 200, 255, 0.4);
-  box-shadow:
-    inset 0 0 8px rgba(255, 255, 255, 0.4),
-    0 4px 12px rgba(200, 200, 200, 0.2);
-  color: #444;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  backdrop-filter: blur(8px);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-#mergeDreamsBtn:hover {
-  background: rgba(255, 255, 255, 0.7);
-  transform: scale(1.05);
-  box-shadow:
-    0 0 0 2px rgba(255, 160, 220, 0.3),
-    0 6px 16px rgba(255, 200, 240, 0.3);
-}
-
-  
-    #controls input,
-    #controls button {
-      font-size: 12px;
-      padding: 3px 8px;
-      height: 30px; /* ✨ 强制限制高度 */
-      border-radius: 12px;
-      width: 100%;
-      box-shadow: none;
-      background: rgba(255, 255, 255, 0.3);
-    }
-  
-    #controls button:hover {
-      background: rgba(255, 255, 255, 0.4);
-      transform: scale(1.02);
-    }
-  
-    #bubbleText::placeholder {
-      font-size: 11px;
-      color: #aaa;
-    }
-
-
-/* 🌈 统一按钮和输入框的梦幻泡泡风格 */
-
-#controls input[type="text"],
-#controls button {
-  font-size: 19px;
-  padding: 12px 20px; /* Adjust padding */
-  height: 48px;
-  line-height: 1.2;
-  border-radius: 28px;
-  width: 100%;
-  box-sizing: border-box;
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(255, 200, 255, 0.3);
-  box-shadow:
-    inset 0 0 6px rgba(255, 255, 255, 0.3),
-    0 4px 8px rgba(220, 220, 220, 0.2);
-  color: #444;
-  font-family: 'PencilPete', sans-serif;
-  font-weight: bold; /* 让浏览器伪加粗一点点 */
-  transition: all 0.3s ease;
-  backdrop-filter: blur(6px);
-  display: flex;
-  justify-content: center; /* Horizontally center text */
-  align-items: center; /* Vertically center text */
-  text-align: center;
-}
-
-/* 🫧 统一 placeholder 样式 */
-#controls input::placeholder {
-  color: #bbb;
-  font-size: 18px;
-  font-style: italic;
-  text-align: center;
-}
-
-/* ✨ hover 效果一致 */
-#controls button:hover {
-  transform: scale(1.02);
-  background: rgba(255, 255, 255, 0.6);
-  box-shadow:
-    0 0 0 2px rgba(255, 160, 220, 0.2),
-    0 6px 14px rgba(255, 200, 240, 0.2);
-}
-
-  
-  
-  /* 颜文字框 */
-  .play-btn .emoji-gray {
-    color: #81acda; /* 或者 gray, #aaa, rgba(0,0,0,0.5) 等 */
-}
-
- /* delete button */
-.delete-btn {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    border: none;
-    background: radial-gradient(circle, #ffd6eb, #ffecf4);
-    color: #444;
-    font-size: 12px;
-    font-weight: bold;
-    font-family: 'StarryFonts', sans-serif;
-    box-shadow:
-      2px 2px 0 #aaa,
-      inset 0 0 6px rgba(255, 255, 255, 0.6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    animation: bubbleBreath 2.8s ease-in-out infinite;
-    transition: transform 0.2s ease;
-    margin-left: 6px;
-    z-index: 1;
-  }
-  
-  .delete-btn:hover {
-    transform: scale(1.2);
-    background: radial-gradient(circle, #ffc8e6, #ffddec);
-    box-shadow:
-      3px 3px 0 #bb3737,
-      inset 0 0 8px rgba(255, 255, 255, 0.9);
-  }
-  
-  /* 🌬️ 呼吸动画 */
-  @keyframes bubbleBreath {
-    0%, 100% {
-      transform: scale(1);
-    }
-    50% {
-      transform: scale(1.1);
-    }
-  }
-
-
-  /* 🌈 统一按钮和输入框的梦幻泡泡风格 */
-#controls input[type="text"],
-#controls button {
-  font-size: 22px;
-  padding: 12px 20px;
-  height: 48px;
-  border-radius: 30px;
-  width: 100%;
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(255, 200, 255, 0.3);
-  box-shadow:
-    inset 0 0 8px rgba(255, 255, 255, 0.4),
-    0 4px 12px rgba(200, 200, 200, 0.2);
-  color: #444;
-  font-family: 'PencilPete', sans-serif;
-  font-weight: bold; /* 让浏览器伪加粗一点点 */
-  transition: all 0.3s ease;
-  backdrop-filter: blur(8px);
-  cursor: pointer;
-  display: flex;
-  justify-content: center; /* Horizontally center text */
-  align-items: center; /* Vertically center text */
-  text-align: center;
-}
-
-/* 🩷 鼠标悬停时放大一点 */
-#controls button:hover {
-  background: rgba(255, 255, 255, 0.6);
-  transform: scale(1.02);
-  box-shadow:
-    0 0 0 2px rgba(255, 160, 220, 0.2),
-    0 6px 16px rgba(255, 200, 240, 0.2);
-}
-
-/* 🩵 输入框聚焦时更亮一些 */
-#controls input[type="text"]:focus {
-  outline: none;
-  background: rgba(255, 255, 255, 0.7);
-  border-color: #ffc4ee;
-  box-shadow:
-    0 0 0 3px rgba(255, 160, 220, 0.3),
-    0 6px 20px rgba(255, 200, 240, 0.3);
-}
-
-/* ☁️ placeholder 更温柔 */
-#controls input::placeholder {
-  color: #aaa;
-  font-size: 19px;
-  font-style: italic;
-  opacity: 0.7;
-}
-
-/* play */
-.play-btn {
-  font-family: 'PencilPete', sans-serif;
-  font-weight: bold; /* 让浏览器伪加粗一点点 */
-  font-size: 13px; /* 可调整 */
-}
-
-
-
-
-
-/* 📱 iPhone SE / 小手机专属优化 */
-@media (max-width: 400px) {
-  body {
-    font-size: 13px;
-    overflow-x: hidden;
-    background-color: #fefefe;
-  }
-
+/* 小屏优化 */
+@media (max-width: 420px) {
   #controls {
-    top: 30%;
-    width: 90%;
-    padding: 8px 12px;
+    top: 28%;
+    width: 92%;
     gap: 6px;
-    border-radius: 20px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-    backdrop-filter: blur(10px);
+    padding: 10px 12px;
   }
-
-  #controls input[type="text"],
-  #controls button {
+  #controls input[type="text"], #controls button {
+    height: 36px;
     font-size: 14px;
-    padding: 8px 12px;
-    height: 38px;
-    border-radius: 20px;
-    background: rgba(255, 255, 255, 0.4);
-  }
-
-  #mergeDreamsBtn {
-    font-size: 16px;
-    height: 40px;
-    padding: 8px 16px;
-    border-radius: 24px;
-    width: 90%;
-    max-width: 260px;
-  }
-
-  #toneControls {
-    margin-top: 300px; /* ✨让它比400px小，位置更靠上 */
-    transform: translate(-50%, -50%) scale(0.55);
-    width: 140px; /* 🌟 改成固定宽度，比原来小 */
-    padding: 8px 12px;
-    border-radius: 20px;
-    font-size: 10px;
-  }
-
-  #toneControls label {
-    font-size: 12px;
-    margin-bottom: 6px;
-  }
-
-  #toneControls input[type="range"] {
-    height: 4px;
-    margin: 4px 0;
-  }
-
-  .bubble {
-    font-size: 10px;
     padding: 6px 10px;
-    max-width: 140px;
-    border-radius: 24px;
-    box-shadow: 3px 3px 0px #444;
   }
-
-  .bubble:hover {
-    transform: scale(1.6);
-  }
-
-  .navbar {
-    padding: 6px 0;
-    font-size: 10px;
-  }
-
-  .navbar a {
-    font-size: 10px;
-    padding: 4px 6px;
-  }
-
-  #processor-section {
-    margin-top: 12px;
-    padding-bottom: 6px;
-  }
-}
-
-
-/* 📱手机适配，让play按钮更小 */
-@media (max-width: 375px) {
-  .play-btn {
-    font-size: 9px; /* 手机上再小一点 */
-    padding: 4px 8px; /* 缩小按钮内部间距 */
-    border-radius: 16px;
-  }
+  .vc-label { width: 84px; }
+  .bubble { font-size: 12px; max-width: 46ch; }
 }
