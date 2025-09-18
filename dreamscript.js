@@ -1,653 +1,368 @@
-// dreamscript.js
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+// ===== 变声：Tone.js 效果链 =====
+let toneReady = false;
+let mic;                 // Tone.UserMedia
+let pitchShift, reverb, chorus, autoWah;
+let eq3;
+let mediaStreamDest;     // WebAudio MediaStreamDestination
+let rec;                 // MediaRecorder for processed stream
+let recChunks = [];
 
+const ui = {
+  pitch: () => $('uiPitch'),
+  pitchVal: () => $('uiPitchVal'),
+  robot: () => $('uiRobot'),
+  chorus: () => $('uiChorus'),
+  reverb: () => $('uiReverb'),
+  eq: () => $('uiEq'),
+  format: () => $('uiFormat'),
+};
 
-// 🪪 替换为你自己的 Supabase 项目地址和 Key
-const supabaseUrl = 'https://uytyxroguktgsymkkoke.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5dHl4cm9ndWt0Z3N5bWtrb2tlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI2NDc2MDQsImV4cCI6MjA1ODIyMzYwNH0.Yn6-gOjT3ZRJvAaO-czhb0IME5JP5g2IEi97TbAA_BU';
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-
-let mediaRecorder;
-let allChunks = [];
-let recordingStream;
-
-// 开始实时试音变声
-let mic, pitchShift, bitCrusher, delay, reverb;
-let isTesting = false;
-let gain;  // Declare globally
-let isToneStarted = false;
-
-
-// 🌟 弹出进入梦境提示
-function createDreamOverlay() {
-    const overlay = document.createElement("div");
-    overlay.id = "dream-overlay";
-    overlay.style.position = "fixed";
-    overlay.style.top = "0";
-    overlay.style.left = "0";
-    overlay.style.width = "100vw";
-    overlay.style.height = "100vh";
-    overlay.style.background = "rgba(255, 255, 255, 0.8)";
-    overlay.style.backdropFilter = "blur(10px)";
-    overlay.style.display = "flex";
-    overlay.style.flexDirection = "column";
-    overlay.style.justifyContent = "center";
-    overlay.style.alignItems = "center";
-    overlay.style.zIndex = "9999";
-    overlay.style.cursor = "pointer";
-    overlay.innerHTML = `<div style="
-    font-family: 'PencilPete', sans-serif;
-font-weight: bold; /* 让浏览器伪加粗一点点 */
-        font-size: 24px;
-        color: #444;
-        padding: 20px 30px;
-        background: rgba(255, 255, 255, 0.6);
-        border-radius: 20px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        text-align: center;
-        backdrop-filter: blur(8px);
-        ">Touch to enter the dream 🎧</div>`;
-
-    document.body.appendChild(overlay);
-
-    overlay.addEventListener("click", async () => {
-        await Tone.start();
-        await startBackgroundNoise();
-        overlay.remove(); // 移除提示层
-        console.log("🌟 Dream started");
-    });
-}
-
-// 页面加载完弹出
-window.addEventListener("DOMContentLoaded", () => {
-    createDreamOverlay();
-});
-
-
-// 🌟 持续的背景白噪音
-let backgroundNoise, backgroundFilter;
-let isBackgroundNoiseStarted = false;
-
-async function startBackgroundNoise() {
-    await Tone.start(); // 启动 Tone.js 音频上下文
-    backgroundNoise = new Tone.Noise('white').start();
-    backgroundFilter = new Tone.Filter(800, "lowpass").toDestination();
-    backgroundNoise.connect(backgroundFilter);
-    backgroundNoise.volume.value = -10;
-    console.log("🎵 背景白噪音已启动");
-}
-
-// 检查并启动白噪音
-function ensureBackgroundNoise() {
-    if (!isBackgroundNoiseStarted) {
-        startBackgroundNoise();
-        isBackgroundNoiseStarted = true;
-    }
-}
-
-// 页面加载完成时，监听第一次用户交互
-window.addEventListener("DOMContentLoaded", () => {
-    document.body.addEventListener("click", ensureBackgroundNoise, { once: true });
-    document.body.addEventListener("touchstart", ensureBackgroundNoise, { once: true });
-});
-
-
-
-// volumeVal
-
-document.getElementById("testToneBtn").addEventListener("click", async () => {
-    const volumeSlider = document.getElementById("volumeSlider");
-    const volumeVal = volumeSlider ? parseFloat(volumeSlider.value) : 1; // 默认音量 1
-
-    // Only create the gain node if it's not already created
-    if (!gain) {
-        gain = new Tone.Gain(volumeVal);
-    } else {
-        gain.gain.value = volumeVal;  // Update gain value if the gain node already exists
-    }
-
-
-    if (!isTesting) {
-        if (!isToneStarted) {
-            await Tone.start(); // Ensure Tone.js context is started only once
-            isToneStarted = true;
-        }
-        mic = new Tone.UserMedia();
-
-        
-        // 从 UI 获取数值
-        const pitch = parseFloat(document.getElementById("pitchSlider").value);
-        const reverbT = parseFloat(document.getElementById("reverbSlider").value);
-        const bit = parseInt(document.getElementById("bitSlider").value);
-        const delayT = parseFloat(document.getElementById("delaySlider").value);
-
-        // 实时音效链
-        pitchShift = new Tone.PitchShift({ pitch });
-        bitCrusher = new Tone.BitCrusher(bit);
-        delay = new Tone.FeedbackDelay(delayT);
-        reverb = new Tone.Reverb({ decay: reverbT });
-
-        // 连接音效链
-        mic.connect(pitchShift);
-        pitchShift.connect(bitCrusher);
-        bitCrusher.connect(delay);
-        delay.connect(reverb);
-        reverb.toDestination();
-        reverb.connect(gain);
-        gain.toDestination();
-
-        await mic.open();
-        console.log("sound test");
-        isTesting = true;
-        document.getElementById("testToneBtn").textContent = "stop";
-        
-    } else {
-        // 停止试音
-        mic.close();
-        mic.disconnect();
-        pitchShift.disconnect();
-        bitCrusher.disconnect();
-        delay.disconnect();
-        reverb.disconnect();
-        isTesting = false;
-        console.log("🛑 已关闭试音");
-        document.getElementById("testToneBtn").textContent = "testing sounds";
-
-
-
-    }
-});
-
-
-// 保存文字 + Base64音频到 Supabase xx
-export async function saveBubbleToSupabase(text, audioBase64 = null) {
-    console.log("📤 上传内容：", { text, hasAudio: !!audioBase64 });
-
-    const { data, error } = await supabase
-        .from('dreams')
-        .insert([
-            { text: text, audio_url: audioBase64, created_at: new Date().toISOString() }
-        ], { returning: 'representation' }); // 返回插入的内容
-
-    if (error) {
-        console.error("❌ 存储失败:", error.message);
-    } else {
-        console.log("✅ 已存入 Supabase:", data);
-        // ✅ 新增：立即生成泡泡
-        if (!error) {
-            console.log("✅ 已存入 Supabase:", data);
-            const bubbleText = text || "";
-            createAndAppendBubble(bubbleText, audioBase64); // 直接用传入的数据生成泡泡
-        }
-    }
-}
-
-
-
-// 录音处理
-export function startRecording() {
-
-        // 录音开始前，先暂停白噪音
-        if (backgroundNoise) {
-            backgroundNoise.stop();
-            console.log('🌫️ 白噪音暂停录音中...');
-        }
-    
-        
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-        recordingStream = stream;
-        allChunks = [];
-        mediaRecorder = new MediaRecorder(stream);
-        mediaRecorder.ondataavailable = e => e.data.size > 0 && allChunks.push(e.data);
-        mediaRecorder.onstop = async () => {
-            const fullBlob = new Blob(allChunks, { type: 'audio/webm' });
-            if (fullBlob.size === 0) return;
-
-            const text = document.getElementById("bubbleText")?.value.trim() || "";
-            processAudioWithTone(fullBlob, text);
-        };
-        mediaRecorder.start();
-    });
-}
-
-export function stopRecording() {
-
-        // 录音结束后，恢复白噪音
-        if (backgroundNoise) {
-            backgroundNoise.start();
-            console.log('🌫️ 白噪音恢复播放');
-        }
-        
-    if (mediaRecorder && recordingStream) {
-        mediaRecorder.stop();
-        recordingStream.getTracks().forEach(t => t.stop());
-    }
-}
-
-// Tone.js 变声处理 ➜ 转为 Base64 存储    xxx
-async function processAudioWithTone(audioBlob, text = "") {
+async function ensureToneChain() {
+    if (toneReady) return;
     await Tone.start();
-    const arrayBuffer = await audioBlob.arrayBuffer();
-    const originalBuffer = await Tone.context.decodeAudioData(arrayBuffer);
+  
+    mic = new Tone.UserMedia();
+  
+    // 取下拉框选择的 deviceId（如无则默认）
+    const deviceId = document.getElementById('micSelect')?.value;
+    const constraints = deviceId
+      ? { audio: { deviceId: { exact: deviceId } } }
+      : { audio: true };
+  
+    await mic.open(constraints);  // ⭐️ 用选中的设备
+    console.log('🎤 mic opened with', constraints);
 
-    const pitch = parseFloat(document.getElementById("pitchSlider").value);
-    const reverbT = parseFloat(document.getElementById("reverbSlider").value);
-    const bit = parseInt(document.getElementById("bitSlider").value);
-    const delayT = parseFloat(document.getElementById("delaySlider").value);
+  // 2) 效果
+  pitchShift = new Tone.PitchShift({ pitch: 0, windowSize: 0.1, delayTime: 0.01, feedback: 0 });
+  chorus     = new Tone.Chorus(4, 2.5, 0.5).start();
+  reverb     = new Tone.Reverb({ decay: 2.5, wet: 0.25 });
+  autoWah    = new Tone.AutoWah({ baseFrequency: 100, octaves: 4, sensitivity: 0.5, Q: 1, gain: 0, wet: 0 }); // 机器人=1时打开
+  eq3        = new Tone.EQ3(-0, -0, -0);
 
-    const offlineDuration = originalBuffer.duration + 1;
+  // 3) 输出到页面（能听见） + 输出到 MediaStreamDestination（用来录）
+  const ac = Tone.getContext().rawContext;
+  mediaStreamDest = ac.createMediaStreamDestination();
 
-    const rendered = await Tone.Offline(({ transport }) => {
-        const player = new Tone.Player(originalBuffer).toDestination();
+  // 构建：mic -> pitch -> autoWah -> chorus -> reverb -> eq -> (destination + mediaStreamDest)
+  mic.connect(pitchShift);
+  pitchShift.connect(autoWah);
+  autoWah.connect(chorus);
+  chorus.connect(reverb);
+  reverb.connect(eq3);
 
-        // 在离线上下文中创建新的音效节点
-        const pitchShift = new Tone.PitchShift({ pitch }).toDestination();
-        const bitCrusher = new Tone.BitCrusher(bit).toDestination();
-        const feedbackDelay = new Tone.FeedbackDelay(delayT).toDestination();
-        const reverb = new Tone.Reverb({ decay: reverbT }).toDestination();
+  // 到扬声器
+  eq3.connect(Tone.getDestination());
+  // 到录音流
+  eq3.connect(mediaStreamDest);
 
-        // 链接音频处理链条（使用新上下文的节点）
-        player.connect(pitchShift);
-        pitchShift.connect(bitCrusher);
-        bitCrusher.connect(feedbackDelay);
-        feedbackDelay.connect(reverb);
-        const gainNode = new Tone.Gain(1).toDestination();
-        reverb.connect(gainNode);
-    
-        player.start(0);
-        transport.start();
-    }, offlineDuration);
+  // UI 联动
+  ui.pitch().addEventListener('input', () => {
+    const v = parseInt(ui.pitch().value, 10) || 0;
+    pitchShift.pitch = v;
+    ui.pitchVal().textContent = String(v);
+  });
 
-    const processedBlob = await bufferToBlob(rendered);
-    const base64 = await blobToBase64(processedBlob);
+  ui.robot().addEventListener('change', () => {
+    autoWah.wet.value = ui.robot().checked ? 1 : 0;
+  });
 
-    // 存入数据库
-    await saveBubbleToSupabase(text || "", base64);
+  ui.chorus().addEventListener('change', () => {
+    chorus.wet.value = ui.chorus().checked ? 0.5 : 0;
+  });
 
-    // ✅ 立即在页面添加泡泡
-    // ❌ 不需要再次 createAndAppendBubble，这一步 Supabase 会处理
-    // createAndAppendBubble(text || "🎵 变声录音", base64);
+  ui.reverb().addEventListener('change', () => {
+    reverb.wet.value = ui.reverb().checked ? 0.25 : 0;
+  });
 
-}
-
-
-// 创建泡泡的地方
-function createAndAppendBubble(text, audioBase64) {
-    const bubble = createBubble(null, text, audioBase64);
-    document.getElementById("bubbleContainer").appendChild(bubble);
-
-
-    animateBubble(bubble); // ✅ 让泡泡动起来
-}
-
-
-// 加载泡泡
-export async function loadBubbles() {
-    const container = document.getElementById("bubbleContainer");
-
-    container.innerHTML = ""; // 清空旧的泡泡
-    // 然后再加载新的泡泡
-    const { data, error } = await supabase
-        .from("dreams")
-        .select("*")
-        .order("created_at", { ascending: false })
-
-    if (error) {
-        console.error("❌ 读取失败:", error.message);
-        return;
+  ui.eq().addEventListener('change', () => {
+    const p = ui.eq().value;
+    switch (p) {
+      case 'phone':  // 窄带电话感
+        eq3.low.value = -12;  // 砍低频
+        eq3.mid.value = -3;
+        eq3.high.value = -12; // 砍高频
+        break;
+      case 'warm':
+        eq3.low.value = +3;
+        eq3.mid.value = 0;
+        eq3.high.value = -2;
+        break;
+      case 'bright':
+        eq3.low.value = -2;
+        eq3.mid.value = 0;
+        eq3.high.value = +4;
+        break;
+      default: // flat
+        eq3.low.value = 0;
+        eq3.mid.value = 0;
+        eq3.high.value = 0;
     }
+  });
 
-    console.log("📦 Supabase 返回数据:", data);
-
-    data.forEach(entry => {
-        console.log("🧼 正在创建泡泡:", entry.id, entry.text, entry.audio_url);
-
-        if (!entry.audio_url && entry.text) {
-            console.warn("⚠️ 只发现了文字泡泡（无音频）");
-        }
-
-        const bubble = createBubble(entry.id, entry.text, entry.audio_url);
-        container.appendChild(bubble);
-
-  // ⏳ 延后再启动动画，确保泡泡成功渲染后再动
-  setTimeout(() => {
-    requestAnimationFrame(() => {
-      animateBubble(bubble);
-    });
-  }, 20);
-
-    });
+  toneReady = true;
 }
 
-export function createBubble(id, text, audioBase64 = null) {
-    const bubble = document.createElement("div");
-    bubble.classList.add("bubble");
-
-    bubble.style.position = "absolute";
-    bubble.style.zIndex = "1000";
-    bubble.style.background = "rgba(255,255,255,0.85)";
-    bubble.style.border = "1px solid black";
-    bubble.style.borderRadius = "8px";
-    bubble.style.padding = "8px";
-    bubble.style.fontFamily = "'PencilPete', sans-serif";
-    bubble.style.fontWeight = "bold"; 
-
-
-    if (!audioBase64) {
-        const textElem = document.createElement("div");
-        textElem.textContent = text;
-        bubble.appendChild(textElem);
-    } else {
-        const playButton = document.createElement("button");
-        playButton.innerHTML = `<span class="emoji-gray">(*・3・)ノ⌒☆</span> PLAY`;
-        playButton.classList.add("play-btn");
-        playButton.onclick = async () => {
-            await Tone.start();
-
-            const response = await fetch(audioBase64);
-            const arrayBuffer = await response.arrayBuffer();
-            const buffer = await Tone.context.decodeAudioData(arrayBuffer);
-
-            const pitch = parseFloat(document.getElementById("pitchSlider").value);
-            const reverbT = parseFloat(document.getElementById("reverbSlider").value);
-            const bit = parseInt(document.getElementById("bitSlider").value);
-            const delayT = parseFloat(document.getElementById("delaySlider").value);
-
-            const player = new Tone.Player(buffer).toDestination();
-            const pitchShift = new Tone.PitchShift({ pitch }).toDestination();
-            const bitCrusher = new Tone.BitCrusher(bit).toDestination();
-            const feedbackDelay = new Tone.FeedbackDelay(delayT).toDestination();
-            const reverb = new Tone.Reverb({ decay: reverbT }).toDestination();
-
-            player.connect(pitchShift);
-            pitchShift.connect(bitCrusher);
-            bitCrusher.connect(feedbackDelay);
-            feedbackDelay.connect(reverb);
-            reverb.toDestination();
-
-            player.start();
-        };
-
-        bubble.appendChild(playButton);
-    }
-
-
-    const del = document.createElement("button");
-    del.textContent = "✕";
-    del.style.marginLeft = "5px";
-    del.classList.add("delete-btn"); // ✅ 添加 class
-    del.onclick = () => deleteBubble(id, bubble);
-    bubble.appendChild(del);
-
-    bubble.style.left = `${Math.random() * (window.innerWidth - 140)}px`;
-    bubble.style.top = `${Math.random() * (window.innerHeight - 80)}px`;
-
-    console.log("🧪 audioBase64 preview:", audioBase64?.substring?.(0, 30));
-
-    return bubble;
+// ===== 录处理后的音：从 mediaStreamDest.stream 录 =====
+function getRecorderForProcessedStream() {
+  const mime = getSupportedMime(); // 你已有的函数，挑浏览器能录的容器（通常 webm/ogg）
+  const r = new MediaRecorder(mediaStreamDest.stream, { mimeType: mime });
+  r.ondataavailable = e => { if (e.data && e.data.size > 0) recChunks.push(e.data); };
+  return r;
 }
 
+// ===== ffmpeg.wasm：把录到的 webm/ogg 转成用户选的目标格式 =====
+let _ffmpeg;
+async function ensureFfmpeg() {
+  if (_ffmpeg) return _ffmpeg;
+  const { createFFmpeg } = FFmpeg;
+  _ffmpeg = createFFmpeg({ log: false });
+  await _ffmpeg.load();
+  return _ffmpeg;
+}
 
-// Updated function to delete a bubble from both the page and Supabase
-async function deleteBubble(id, bubbleElement) {
-    if (!id) {
-        console.error("❌ Invalid ID, cannot delete bubble!");
-        return; // Exit the function if ID is invalid
+/** inputBlob -> { blob, mime, ext } to target: m4a/mp3/ogg/webm */
+async function transcodeToTarget(inputBlob, targetExt) {
+    const t = (inputBlob.type || '').toLowerCase();
+    if ((targetExt === 'm4a' && (t.includes('mp4') || t.includes('aac'))) ||
+        (targetExt === 'mp3' && t.includes('mpeg')) ||
+        (targetExt === 'ogg' && t.includes('ogg')) ||
+        (targetExt === 'webm' && t.includes('webm'))) {
+      return { blob: inputBlob, mime: inputBlob.type || guessMimeByExt(targetExt), ext: targetExt };
     }
-
+  
+    const ffmpeg = await ensureFfmpeg();
+  
+    const inName = t.includes('ogg') ? 'in.ogg' : (t.includes('webm') ? 'in.webm' : 'in.dat');
+    const arr = new Uint8Array(await inputBlob.arrayBuffer());
+    ffmpeg.FS('writeFile', inName, arr);
+  
+    async function runOnce(ext) {
+      const outName = 'out.' + ext;
+      let args;
+      switch (ext) {
+        case 'm4a': // AAC（很多 wasm 构建没有 aac 编码，可能会抛错）
+          args = ['-i', inName, '-c:a', 'aac', '-b:a', '128k', '-movflags', 'faststart', outName];
+          break;
+        case 'mp3':
+          args = ['-i', inName, '-c:a', 'libmp3lame', '-b:a', '192k', outName];
+          break;
+        case 'ogg':
+          args = ['-i', inName, '-c:a', 'libopus', '-b:a', '96k', outName];
+          break;
+        case 'webm':
+        default:
+          args = ['-i', inName, '-c:a', 'libopus', '-b:a', '96k', outName];
+      }
+      await ffmpeg.run(...args);
+      const data = ffmpeg.FS('readFile', outName);
+      const mime = guessMimeByExt(ext);
+      const blob = new Blob([data.buffer], { type: mime });
+      try { ffmpeg.FS('unlink', outName); } catch {}
+      return { blob, mime, ext };
+    }
+  
     try {
-        console.log("🗑 Deleting doc ID:", id);
-
-        // Delete the bubble from Supabase
-        const { error } = await supabase
-            .from('dreams') // Your Supabase table name
-            .delete()
-            .eq('id', id); // Use the correct field to match the record ID
-
-        if (error) {
-            console.error("❌ Failed to delete from Supabase:", error.message);
-            return; // If the deletion fails, do not remove the bubble from the page
+      // 先按用户选择来
+      return await runOnce(targetExt);
+    } catch (e) {
+      console.warn('目标格式转码失败，尝试回退 MP3：', e);
+      // 若目标是 m4a，但 aac 编码不可用，回退 MP3
+      if (targetExt !== 'mp3') {
+        try {
+          return await runOnce('mp3');
+        } catch (e2) {
+          console.error('回退 MP3 也失败：', e2);
         }
-
-        // If deletion from Supabase was successful, remove the bubble from the page
-        bubbleElement.remove();
-        console.log("✅ Successfully deleted bubble from Supabase and removed from page.");
-    } catch (error) {
-        console.error("❌ Failed to delete bubble:", error);
+      }
+      throw e;
+    } finally {
+      try { ffmpeg.FS('unlink', inName); } catch {}
     }
-}
-
-
-// 小工具：blob 转 base64 xxx
-function blobToBase64(blob) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            if (reader.result) resolve(reader.result);
-            else reject("⚠️ FileReader 读取失败");
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
+  }
+  
+  if (audioUrl && audioUrl.trim()) {
+    const safeUrl = normalizeDriveUrl(audioUrl.trim());
+  
+    const audio = document.createElement('audio');
+    audio.preload = 'metadata';
+    audio.style.display = 'none';
+    audio.crossOrigin = 'anonymous'; // 👈 新增
+    audio.src = safeUrl;
+  
+    // 如果你在 row 里也存了 mime，可加上 <source type="..."> ：
+    // const src = document.createElement('source');
+    // src.src = safeUrl;
+    // src.type = guessMimeFromExt(safeUrl); // 你可以写个根据后缀猜 type 的小函数
+    // audio.appendChild(src);
+  
+    const btn = document.createElement('button');
+    btn.className = 'audio-btn';
+    btn.textContent = '▶ 播放';
+  
+    const dur = document.createElement('span');
+    dur.style.marginLeft = '8px';
+    dur.textContent = '';
+  
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  
+    audio.addEventListener('loadedmetadata', () => {
+      dur.textContent = formatDuration(audio.duration);
     });
-}
-
-// 小工具：音频缓冲区转 blob（WAV）
-async function bufferToBlob(audioBuffer) {
-    const numOfChannels = audioBuffer.numberOfChannels;
-    const length = audioBuffer.length * numOfChannels * 2 + 44;
-    const buffer = new ArrayBuffer(length);
-    const view = new DataView(buffer);
-    const channels = [];
-
-    const writeStr = (v, offset, str) => {
-        for (let i = 0; i < str.length; i++) v.setUint8(offset + i, str.charCodeAt(i));
-    };
-
-    writeStr(view, 0, "RIFF");
-    view.setUint32(4, length - 8, true);
-    writeStr(view, 8, "WAVE");
-    writeStr(view, 12, "fmt ");
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    view.setUint16(22, numOfChannels, true);
-    view.setUint32(24, audioBuffer.sampleRate, true);
-    view.setUint32(28, audioBuffer.sampleRate * 2 * numOfChannels, true);
-    view.setUint16(32, numOfChannels * 2, true);
-    view.setUint16(34, 16, true);
-    writeStr(view, 36, "data");
-    view.setUint32(40, length - 44, true);
-
-    for (let i = 0; i < numOfChannels; i++) {
-        channels.push(audioBuffer.getChannelData(i));
-    }
-
-    let offset = 44;
-    for (let i = 0; i < audioBuffer.length; i++) {
-        for (let j = 0; j < numOfChannels; j++) {
-            let sample = Math.max(-1, Math.min(1, channels[j][i]));
-            view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
-            offset += 2;
-        }
-    }
-
-    return new Blob([view], { type: "audio/wav" });
-}
-
-// ✅ 让泡泡动起来
-function animateBubble(bubble) {
-    let dx = (Math.random() * 2 - 1) * 1.2; // 水平速度
-    let dy = (Math.random() * 2 - 1) * 1.2; // 垂直速度
-
-    function move() {
-        const rect = bubble.getBoundingClientRect();
-        const maxX = window.innerWidth - rect.width;
-        const maxY = window.innerHeight - rect.height;
-
-        
-        let x = bubble.offsetLeft + dx;
-        let y = bubble.offsetTop + dy;
-
-        // 📦 边界反弹（仅网页四边）
-        if (x < 0 || x > maxX) dx = -dx;
-        if (y < 0 || y > maxY) dy = -dy;
-
-        // 🫧 更新位置
-        bubble.style.left = `${Math.max(0, Math.min(x, maxX))}px`;
-        bubble.style.top = `${Math.max(0, Math.min(y, maxY))}px`;
-
-        requestAnimationFrame(move);
-    }
-
-    requestAnimationFrame(move);
-}
-
-// Add event listener for the "Merge Dreams" button
-document.getElementById("mergeDreamsBtn").addEventListener("click", async () => {
-    await processAndStoreDreams(); // fetch + process + store
-    window.location.href = "mergeddreams.html";
-});
-
-
-async function processAndStoreDreams() {
-    let allTextFragments = [];
-    let allAudioFragments = [];
-
-    // Fetch bubble data directly from Supabase (same as loadBubbles)
-    const { data, error } = await supabase
-        .from("dreams")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-    if (error) {
-        console.error("❌ Supabase fetch failed:", error.message);
-        return;
-    }
-
-    if (!data || data.length === 0) {
-        console.warn("⚠️ No bubble data found.");
-        return;
-    }
-
-    // Process each entry from Supabase
-    data.forEach(entry => {
-        if (entry.text) {
-            const words = entry.text.trim().split(/\s+/);
-            allTextFragments.push(...words); // Push all words individually
-        }
-
-        if (entry.audio_url) {
-            allAudioFragments.push(entry.audio_url); // Add audio URL
-        }
+  
+    audio.addEventListener('ended', () => {
+      if (currentAudio === audio) {
+        btn.textContent = '▶ 播放';
+        currentAudio = null;
+        currentBtn = null;
+      }
     });
-
-    console.log("✨ Collected words:", allTextFragments.length);
-    console.log("🎧 Collected audio:", allAudioFragments.length);
-
-    // Scramble all words
-    const scrambledWords = scrambleArray(allTextFragments);
-
-    // Create grouped sentences
-    const groupedSentences = [];
-    const groupSize = 7;
-    for (let i = 0; i < scrambledWords.length; i += groupSize) {
-        groupedSentences.push(scrambledWords.slice(i, i + groupSize).join(" "));
-    }
-
-    // Reconstruct long audio
-    const longAudio = await reconstructLongAudio(allAudioFragments);
-
-    // Save to localStorage
-    localStorage.setItem("processedTextFragments", JSON.stringify(groupedSentences));
-    localStorage.setItem("processedAudioFragments", JSON.stringify(longAudio));
-}
-
-function scrambleArray(arr) {
-    for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]]; // Swap elements
-    }
-    return arr;
-}
-
-async function reconstructLongAudio(audioFragments) {
-    if (!audioFragments || audioFragments.length === 0) return null;
-
-    let allAudioBuffers = [];
-
-    // Fetch and decode each audio fragment
-    for (let audioUrl of audioFragments) {
-        const response = await fetch(audioUrl);
-        const audioBlob = await response.blob();
-        const arrayBuffer = await audioBlob.arrayBuffer();
-        const buffer = await Tone.context.decodeAudioData(arrayBuffer);
-        allAudioBuffers.push(buffer);
-    }
-
-    const sampleRate = Tone.context.sampleRate;
-    const totalDuration = 60; // seconds
-    const longBuffer = Tone.context.createBuffer(1, sampleRate * totalDuration, sampleRate);
-    const output = longBuffer.getChannelData(0);
-
-    let currentSample = 0;
-    while (currentSample < output.length) {
-        const randomBuffer = allAudioBuffers[Math.floor(Math.random() * allAudioBuffers.length)];
-        const input = randomBuffer.getChannelData(0);
-
-        for (let i = 0; i < input.length && currentSample < output.length; i++) {
-            output[currentSample++] = input[i];
+  
+    btn.addEventListener('click', async () => {
+      if (currentAudio && currentAudio !== audio) {
+        currentAudio.pause();
+        if (currentBtn) currentBtn.textContent = '▶ 播放';
+      }
+      if (audio.paused) {
+        try {
+          await audio.play();
+          btn.textContent = '⏸ 暂停';
+          currentAudio = audio;
+          currentBtn = btn;
+        } catch (e) {
+          console.error('❌ 无法播放音频：', e);
+          // 播放失败就降级为下载
+          btn.remove(); dur.remove(); audio.remove();
+          const link = document.createElement('a');
+          link.href = safeUrl;
+          link.target = '_blank';
+          link.rel = 'noopener';
+          link.textContent = isSafari
+            ? '⬇ 下载收听（Safari 不支持此格式）'
+            : '⬇ 下载收听（当前浏览器不支持此格式）';
+          wrap.appendChild(link);
         }
-    }
-
-    // Convert to Blob and URL
-    const audioBlob = await bufferToWavBlob(longBuffer);
-    return URL.createObjectURL(audioBlob);
-}
-
-function bufferToWavBlob(buffer) {
-    const wav = encodeWAV(buffer);
-    return new Blob([wav], { type: 'audio/wav' });
-}
-
-// Minimal audioBufferToWav implementation (1 channel only for simplicity)
-function encodeWAV(buffer) {
-    const numOfChan = buffer.numberOfChannels;
-    const length = buffer.length * numOfChan * 2 + 44;
-    const view = new DataView(new ArrayBuffer(length));
-    const sampleRate = buffer.sampleRate;
-
-    function writeString(view, offset, str) {
-        for (let i = 0; i < str.length; i++) {
-            view.setUint8(offset + i, str.charCodeAt(i));
+      } else {
+        audio.pause();
+        btn.textContent = '▶ 播放';
+        if (currentAudio === audio) {
+          currentAudio = null;
+          currentBtn = null;
         }
-    }
+      }
+    });
+  }
 
-    let offset = 0;
-    writeString(view, offset, 'RIFF'); offset += 4;
-    view.setUint32(offset, length - 8, true); offset += 4;
-    writeString(view, offset, 'WAVE'); offset += 4;
-    writeString(view, offset, 'fmt '); offset += 4;
-    view.setUint32(offset, 16, true); offset += 4;
-    view.setUint16(offset, 1, true); offset += 2;
-    view.setUint16(offset, numOfChan, true); offset += 2;
-    view.setUint32(offset, sampleRate, true); offset += 4;
-    view.setUint32(offset, sampleRate * numOfChan * 2, true); offset += 4;
-    view.setUint16(offset, numOfChan * 2, true); offset += 2;
-    view.setUint16(offset, 16, true); offset += 2;
-    writeString(view, offset, 'data'); offset += 4;
-    view.setUint32(offset, length - offset - 4, true); offset += 4;
-
-    for (let i = 0; i < buffer.length; i++) {
-        for (let channel = 0; channel < numOfChan; channel++) {
-            const sample = buffer.getChannelData(channel)[i];
-            const s = Math.max(-1, Math.min(1, sample));
-            view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-            offset += 2;
-        }
-    }
-
-    return view;
+// 根据 URL 粗略猜测 MIME
+function guessMimeFromUrl(u) {
+  const p = (u || '').split('?')[0].toLowerCase();
+  if (p.endsWith('.m4a') || p.endsWith('.mp4')) return 'audio/mp4';
+  if (p.endsWith('.mp3')) return 'audio/mpeg';
+  if (p.endsWith('.wav')) return 'audio/wav';
+  if (p.endsWith('.ogg') || p.endsWith('.oga')) return 'audio/ogg';
+  if (p.endsWith('.webm')) return 'audio/webm';
+  return '';
 }
 
+// 统一生成“语音泡泡”UI（放到工具函数区）
+function buildAudioBubble(wrap, rawUrl) {
+  const safeUrl = normalizeDriveUrl(rawUrl.trim());
+  const lower = safeUrl.toLowerCase();
 
+  // 能力探测
+  const probe = document.createElement('audio');
+  const canMp4  = !!probe.canPlayType && probe.canPlayType('audio/mp4');
+  const canWebm = !!probe.canPlayType && probe.canPlayType('audio/webm');
+  const canOgg  = !!probe.canPlayType && probe.canPlayType('audio/ogg');
+  const looksMp4  = lower.includes('.m4a') || lower.includes('.mp4');
+  const looksWebm = lower.includes('.webm');
+  const looksOgg  = lower.includes('.ogg') || lower.includes('audio%2Fogg');
 
+  const likelyUnsupported =
+    (looksWebm && !canWebm) ||
+    (looksOgg  && !canOgg)  ||
+    (!looksMp4 && !looksWebm && !looksOgg && !canMp4);
+
+  if (likelyUnsupported) {
+    const link = document.createElement('a');
+    link.href = safeUrl;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.textContent = '⬇ 下载收听（当前浏览器不支持此格式）';
+    wrap.appendChild(link);
+    return;
+  }
+
+  // 用 <source type="..."> 帮助浏览器判定
+  const audio = document.createElement('audio');
+  audio.preload = 'metadata';
+  audio.style.display = 'none';
+  // 不要设置 crossOrigin（Drive 多数无 CORS）
+
+  const source = document.createElement('source');
+  source.src = safeUrl;
+  source.type = guessMimeFromUrl(safeUrl);
+  audio.appendChild(source);
+
+  const btn = document.createElement('button');
+  btn.className = 'audio-btn';
+  btn.textContent = '▶ 播放';
+
+  const dur = document.createElement('span');
+  dur.style.marginLeft = '8px';
+  dur.textContent = '';
+
+  audio.addEventListener('loadedmetadata', () => {
+    dur.textContent = formatDuration(audio.duration);
+  });
+  audio.addEventListener('ended', () => {
+    if (currentAudio === audio) {
+      btn.textContent = '▶ 播放';
+      currentAudio = null;
+      currentBtn = null;
+    }
+  });
+  audio.addEventListener('error', () => {
+    console.error('❌ 音频加载失败', {
+      src: source.src,
+      networkState: audio.networkState,
+      readyState: audio.readyState,
+      error: audio.error
+    });
+  });
+
+  btn.addEventListener('click', async () => {
+    if (currentAudio && currentAudio !== audio) {
+      currentAudio.pause();
+      if (currentBtn) currentBtn.textContent = '▶ 播放';
+    }
+    if (audio.readyState === 0) audio.load();
+    try {
+      if (audio.paused) {
+        await audio.play();
+        btn.textContent = '⏸ 暂停';
+        currentAudio = audio;
+        currentBtn = btn;
+      } else {
+        audio.pause();
+        btn.textContent = '▶ 播放';
+        if (currentAudio === audio) {
+          currentAudio = null;
+          currentBtn = null;
+        }
+      }
+    } catch (e) {
+      console.error('❌ 无法播放音频：', e);
+      btn.remove(); dur.remove(); audio.remove();
+      const link = document.createElement('a');
+      link.href = safeUrl;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.textContent = '⬇ 下载收听（当前浏览器不支持此格式）';
+      wrap.appendChild(link);
+    }
+  });
+
+  wrap.appendChild(btn);
+  wrap.appendChild(dur);
+  wrap.appendChild(audio);
+}
