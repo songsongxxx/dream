@@ -6,11 +6,9 @@ const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwN2_h8gvABFBO4R13B
 const ui = {
   pitch: () => $('uiPitch'),
   pitchVal: () => $('uiPitchVal'),
-  robot: () => $('uiRobot'),
-  chorus: () => $('uiChorus'),
-  reverb: () => $('uiReverb'),
-  eq: () => $('uiEq'),
-  format: () => $('uiFormat'), // mp3/m4a/ogg/webm
+  dreamBot: () => $('uiRobot'), // Renamed from "robot"
+  echoWaves: () => $('uiChorus'), // Renamed from "chorus"
+  etherealSpace: () => $('uiReverb'), // Renamed from "reverb"
 };
 
 /* 浏览器录制容器优先级 */
@@ -47,17 +45,16 @@ async function ensureToneChain() {
   await Tone.start();
 
   mic = new Tone.UserMedia();
-  const deviceId = $('micSelect')?.value;
-  const constraints = deviceId ? { audio: { deviceId: { exact: deviceId } } } : { audio: true };
+  const constraints = { audio: true }; // Always use the default microphone
   await mic.open(constraints);
-  console.log('🎤 mic opened with', constraints);
+  console.log('🎤 Default mic opened with', constraints);
 
-  // 效果
+  // Effects
   pitchShift = new Tone.PitchShift({ pitch: 0, windowSize: 0.1, delayTime: 0.01, feedback: 0 });
   _chorus     = new Tone.Chorus(4, 2.5, 0.5).start();
   _reverb     = new Tone.Reverb({ decay: 2.5, wet: 0.25 });
   autoWah     = new Tone.AutoWah({ baseFrequency: 100, octaves: 4, sensitivity: 0.5, Q: 1, gain: 0, wet: 0 });
-  eq3         = new Tone.EQ3(0, 0, 0);
+  eq3         = new Tone.EQ3(0, 0, 0); // Default EQ settings, no user interaction
 
   const ac = Tone.getContext().rawContext;
   mediaStreamDest = ac.createMediaStreamDestination();
@@ -74,27 +71,25 @@ async function ensureToneChain() {
 
   // UI 联动
   ui.pitch()?.addEventListener('input', () => {
-    const v = parseInt(ui.pitch().value, 10) || 0;
+    const el = ui.pitch();
+    const v = parseInt(el.value, 10) || 0;
     pitchShift.pitch = v;
     ui.pitchVal().textContent = String(v);
+
+    // Update slider progress CSS var (--p)
+    const min = parseInt(el.min || '0', 10);
+    const max = parseInt(el.max || '100', 10);
+    const pct = ((v - min) / (max - min)) * 100;
+    el.style.setProperty('--p', `${Math.max(0, Math.min(100, pct))}%`);
   });
-  ui.robot()?.addEventListener('change', () => {
-    autoWah.wet.value = ui.robot().checked ? 1 : 0;
+  ui.dreamBot()?.addEventListener('change', () => { // Updated to "dreamBot"
+    autoWah.wet.value = ui.dreamBot().checked ? 1 : 0;
   });
-  ui.chorus()?.addEventListener('change', () => {
-    _chorus.wet.value = ui.chorus().checked ? 0.5 : 0;
+  ui.echoWaves()?.addEventListener('change', () => { // Updated to "echoWaves"
+    _chorus.wet.value = ui.echoWaves().checked ? 0.5 : 0;
   });
-  ui.reverb()?.addEventListener('change', () => {
-    _reverb.wet.value = ui.reverb().checked ? 0.25 : 0;
-  });
-  ui.eq()?.addEventListener('change', () => {
-    const p = ui.eq().value;
-    switch (p) {
-      case 'phone':  eq3.low.value = -12; eq3.mid.value = -3;  eq3.high.value = -12; break;
-      case 'warm':   eq3.low.value = +3;  eq3.mid.value = 0;   eq3.high.value = -2;  break;
-      case 'bright': eq3.low.value = -2;  eq3.mid.value = 0;   eq3.high.value = +4;  break;
-      default:       eq3.low.value = 0;   eq3.mid.value = 0;   eq3.high.value = 0;
-    }
+  ui.etherealSpace()?.addEventListener('change', () => { // Updated to "etherealSpace"
+    _reverb.wet.value = ui.etherealSpace().checked ? 0.25 : 0;
   });
 
   toneReady = true;
@@ -269,11 +264,13 @@ function postViaHiddenForm(url, fields) {
   });
 }
 async function submitToGAS({ text = '', audioB64 = '', audioMime = '', filename = '' }) {
+  const timestamp = Date.now(); // Add a timestamp for the bubble
   await postViaHiddenForm(WEB_APP_URL, {
     text,
     audio_b64: audioB64,
     audio_mime: audioMime,
-    filename
+    filename,
+    timestamp // Include the timestamp in the submission
   });
 }
 function loadFromGAS() {
@@ -335,132 +332,172 @@ let currentBtn = null;
 
 function renderRows(rows) {
   const container = $('bubbleContainer');
-  if (!container) { console.error('❌ 缺少 #bubbleContainer 容器'); return; }
+  if (!container) { console.error('❌ Missing #bubbleContainer'); return; }
   container.innerHTML = '';
+
+  const bubbles = [];
+  let screenWidth = window.innerWidth;
+  let screenHeight = window.innerHeight;
+
+  const createBubble = ({ text, timestamp, audioUrl, audioMime, audioData }, idx) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'bubble';
+    wrap.dataset.timestamp = timestamp || Date.now();
+
+    // Random initial position and slower velocity
+    const bubbleSize = Math.random() * 50 + 50; // Random size between 50px and 100px
+    const x = Math.random() * (screenWidth - bubbleSize);
+    const y = Math.random() * (screenHeight - bubbleSize);
+    const velocityX = (Math.random() - 0.5) * 0.5; // Further reduced velocity between -0.25 and 0.25
+    const velocityY = (Math.random() - 0.5) * 0.5;
+
+    wrap.style.width = `${bubbleSize}px`;
+    wrap.style.height = `${bubbleSize}px`;
+    wrap.style.left = `${x}px`;
+    wrap.style.top = `${y}px`;
+
+    // Wrap content for precise measuring
+    const content = document.createElement('div');
+    content.className = 'bubble-content';
+
+    if (text) {
+      const meta = document.createElement('div');
+      meta.className = 'bubble-text';
+      meta.textContent = text;
+      content.appendChild(meta);
+    }
+    if (audioUrl || audioData) {
+      const audio = document.createElement('audio');
+      audio.controls = true;
+      const source = document.createElement('source');
+      source.src = audioData || normalizeDriveUrl(audioUrl.trim());
+      source.type = audioMime || guessMimeFromUrl(audioUrl);
+      audio.appendChild(source);
+      content.appendChild(audio);
+    }
+
+    wrap.appendChild(content);
+    container.appendChild(wrap);
+
+    // Track this bubble
+    const rec = { element: wrap, x, y, velocityX, velocityY, size: bubbleSize };
+    bubbles.push(rec);
+
+    // Pause motion + precisely expand to fit all content on hover
+    const initial = { width: bubbleSize, height: bubbleSize };
+
+    wrap.addEventListener('mouseenter', () => {
+      // pause movement
+      rec._vx = rec.velocityX; rec._vy = rec.velocityY;
+      rec.velocityX = 0; rec.velocityY = 0;
+
+      // enable measuring (children laid out but invisible)
+      wrap.classList.add('bubble--measuring');
+
+      const contentEl = wrap.querySelector('.bubble-content');
+      if (!contentEl) return;
+
+      // IMPORTANT: remove tiny fixed size so content can define size
+      wrap.style.width = 'auto';
+      wrap.style.height = 'auto';
+      wrap.style.maxWidth = '90vw';
+      wrap.style.maxHeight = '90vh';
+
+      // readable max measure width
+      const maxMeasureWidth = Math.min(window.innerWidth * 0.9, 720);
+      contentEl.style.maxWidth = maxMeasureWidth + 'px';
+
+      // force reflow to get correct sizes (incl. audio)
+      // eslint-disable-next-line no-unused-expressions
+      contentEl.offsetWidth;
+
+      const padding = 16; // keep in sync with CSS .bubble--open padding
+      const rect = contentEl.getBoundingClientRect();
+      const targetW = Math.ceil(rect.width) + padding * 2;
+      const targetH = Math.ceil(rect.height) + padding * 2;
+
+      const finalW = Math.min(targetW, Math.floor(window.innerWidth * 0.9));
+      const finalH = Math.min(targetH, Math.floor(window.innerHeight * 0.9));
+
+      // apply exact size and open visuals
+      wrap.style.width = finalW + 'px';
+      wrap.style.height = finalH + 'px';
+      wrap.classList.add('bubble--open');
+      wrap.classList.remove('bubble--measuring');
+
+      // keep fully on-screen
+      const right = rec.x + finalW;
+      const bottom = rec.y + finalH;
+      const deltaX = Math.max(0, right - window.innerWidth + 8);
+      const deltaY = Math.max(0, bottom - window.innerHeight + 8);
+      rec.x = Math.max(8, rec.x - deltaX);
+      rec.y = Math.max(8, rec.y - deltaY);
+      wrap.style.left = rec.x + 'px';
+      wrap.style.top  = rec.y + 'px';
+    });
+
+    wrap.addEventListener('mouseleave', () => {
+      // resume movement
+      rec.velocityX = rec._vx ?? rec.velocityX;
+      rec.velocityY = rec._vy ?? rec.velocityY;
+
+      // restore original small bubble look
+      wrap.classList.remove('bubble--open', 'bubble--measuring');
+      wrap.style.maxWidth = '';
+      wrap.style.maxHeight = '';
+      wrap.style.width = initial.width + 'px';
+      wrap.style.height = initial.height + 'px';
+    });
+
+    return wrap;
+  };
 
   rows.forEach(({ text, timestamp, audioUrl, audioMime, audioData }, idx) => {
     if (!text && !audioUrl && !audioData) return;
+    createBubble({ text, timestamp, audioUrl, audioMime, audioData }, idx);
+  });
 
-    const wrap = document.createElement('div');
-    wrap.className = 'bubble';
-    wrap.style.visibility = 'hidden';
+  // Animate bubbles
+  function animateBubbles() {
+    bubbles.forEach((bubble) => {
+      // Update position
+      bubble.x += bubble.velocityX;
+      bubble.y += bubble.velocityY;
 
-    const meta = document.createElement('div');
-    const timeStr = timestamp ? new Date(timestamp).toLocaleString() : '';
-    meta.textContent = `${text || ((audioUrl || audioData) ? '语音消息' : '')}${timeStr ? `（${timeStr}）` : ''}`;
-    wrap.appendChild(meta);
+      // Bounce off edges
+      if (bubble.x <= 0 || bubble.x + bubble.size >= screenWidth) {
+        bubble.velocityX *= -1;
+        bubble.x = Math.max(0, Math.min(bubble.x, screenWidth - bubble.size));
+      }
+      if (bubble.y <= 0 || bubble.y + bubble.size >= screenHeight) {
+        bubble.velocityY *= -1;
+        bubble.y = Math.max(0, Math.min(bubble.y, screenHeight - bubble.size));
+      }
 
-    // 优先使用内联 data:URL，其次 Drive 链接（已规范为 usercontent 域）
-    const srcUrl  = audioData || (audioUrl ? normalizeDriveUrl(audioUrl.trim()) : '');
-    if (srcUrl) {
-      const srcType = audioData ? (audioMime || '') : guessMimeFromUrl(srcUrl);
+      // Apply updated position
+      bubble.element.style.left = `${bubble.x}px`;
+      bubble.element.style.top = `${bubble.y}px`;
+    });
 
-      const audio = document.createElement('audio');
-      audio.preload = audioData ? 'none' : 'metadata';
-      audio.style.display = 'none';
+    requestAnimationFrame(animateBubbles);
+  }
 
-      const source = document.createElement('source');
-      source.src = srcUrl;
-      if (srcType) source.type = srcType;
-      audio.appendChild(source);
+  animateBubbles();
 
-      const btn = document.createElement('button');
-      btn.className = 'audio-btn';
-      btn.textContent = '▶ 播放';
+  // Update screen dimensions on resize
+  window.addEventListener('resize', () => {
+    screenWidth = window.innerWidth;
+    screenHeight = window.innerHeight;
 
-      const dur = document.createElement('span');
-      dur.style.marginLeft = '8px';
-      dur.textContent = '';
-
-      audio.addEventListener('loadedmetadata', () => {
-        dur.textContent = formatDuration(audio.duration);
-      });
-      audio.addEventListener('ended', () => {
-        if (currentAudio === audio) {
-          btn.textContent = '▶ 播放';
-          currentAudio = null;
-          currentBtn = null;
-        }
-      });
-
-      btn.addEventListener('click', async () => {
-        if (currentAudio && currentAudio !== audio) {
-          currentAudio.pause();
-          if (currentBtn) currentBtn.textContent = '▶ 播放';
-        }
-        if (audio.readyState === 0) audio.load();
-        try {
-          if (audio.paused) {
-            await audio.play();
-            btn.textContent = '⏸ 暂停';
-            currentAudio = audio;
-            currentBtn = btn;
-          } else {
-            audio.pause();
-            btn.textContent = '▶ 播放';
-            if (currentAudio === audio) {
-              currentAudio = null;
-              currentBtn = null;
-            }
-          }
-        } catch (e) {
-          console.error('❌ 无法播放音频：', e);
-          alert('无法播放音频，请检查格式或权限');
-        }
-      });
-
-      wrap.appendChild(btn);
-      wrap.appendChild(dur);
-      wrap.appendChild(audio);
-    }
-
-    container.appendChild(wrap);
-
-    // 漂浮动画
-    requestAnimationFrame(() => {
-      const cw = container.clientWidth;
-      const ch = container.clientHeight || window.innerHeight * 0.6;
-      const bw = wrap.offsetWidth;
-      const bh = wrap.offsetHeight;
-
-      const x0 = rand(0, Math.max(0, cw - bw));
-      const y0 = rand(0, Math.max(0, ch - bh));
-      const x1 = clamp(x0 + rand(-140, 140), 0, Math.max(0, cw - bw));
-      const y1 = clamp(y0 + rand(-100, 100), 0, Math.max(0, ch - bh));
-      wrap.style.left = `${x0}px`;
-      wrap.style.top  = `${y0}px`;
-      wrap.style.setProperty('--x0', `${x0}px`);
-      wrap.style.setProperty('--x1', `${x1}px`);
-      wrap.style.setProperty('--y0', `${y0}px`);
-      wrap.style.setProperty('--y1', `${y1}px`);
-      wrap.style.setProperty('--dur-x', `${rand(10,16).toFixed(2)}s`);
-      wrap.style.setProperty('--dur-y', `${rand(8,14).toFixed(2)}s`);
-      wrap.style.setProperty('--delay-x', `${rand(-6,0).toFixed(2)}s`);
-      wrap.style.setProperty('--delay-y', `${rand(-6,0).toFixed(2)}s`);
-      wrap.style.zIndex = 10 + idx;
-      wrap.classList.add('float');
-      wrap.style.visibility = 'visible';
+    // Ensure bubbles remain within the new screen dimensions
+    bubbles.forEach((bubble) => {
+      bubble.x = Math.max(0, Math.min(bubble.x, screenWidth - bubble.size));
+      bubble.y = Math.max(0, Math.min(bubble.y, screenHeight - bubble.size));
     });
   });
 }
 
 /* ============ 其他功能 ============ */
-async function listMics() {
-  const devSel = $('micSelect') || document.createElement('select');
-  devSel.id = 'micSelect';
-  devSel.innerHTML = '';
-  $('controls')?.appendChild(devSel);
-  try {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const mics = devices.filter(d => d.kind === 'audioinput');
-    mics.forEach((d, i) => {
-      const opt = document.createElement('option');
-      opt.value = d.deviceId;
-      opt.textContent = d.label || `麦克风 ${i+1}`;
-      devSel.appendChild(opt);
-    });
-  } catch (err) { console.error('枚举麦克风失败', err); }
-}
 async function checkMicPermissions() {
   try { await navigator.mediaDevices.getUserMedia({ audio: true }); }
   catch (err) { console.error('无法访问麦克风', err); alert('无法访问麦克风，请检查浏览器权限'); }
@@ -477,7 +514,16 @@ function blobToDataURL(blob) {
 /* ============ 事件绑定 ============ */
 document.addEventListener('DOMContentLoaded', () => {
   loadFromGAS().catch(console.error);
-  listMics().catch(console.error);
+
+  // Initialize slider progress once on load
+  const el = ui.pitch?.();
+  if (el) {
+    const v = parseInt(el.value, 10) || 0;
+    const min = parseInt(el.min || '0', 10);
+    const max = parseInt(el.max || '100', 10);
+    const pct = ((v - min) / (max - min)) * 100;
+    el.style.setProperty('--p', `${Math.max(0, Math.min(100, pct))}%`);
+  }
 
   $('recStart')?.addEventListener('click', startRec);
 
@@ -487,7 +533,8 @@ document.addEventListener('DOMContentLoaded', () => {
       alert('录音为空或失败，请重试'); return;
     }
 
-    const targetExt = ui.format()?.value || 'mp3';
+    // Hardcoded MP3 as the target format
+    const targetExt = 'mp3';
     let out = { blob: procBlob, mime: procBlob.type || 'audio/webm', ext: 'webm' };
     try { out = await transcodeToTarget(procBlob, targetExt); }
     catch (e) { console.warn('转码失败，将上传原始格式：', e); }

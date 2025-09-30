@@ -96,6 +96,29 @@ html, body {
   max-width: 720px;
   padding-top: 48px; /* 避开导航 */
 }
+
+/* Compact controls for desktop */
+.voice-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+  margin: 40px auto;
+  max-width: 720px;
+}
+
+.vc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vc-label {
+  font-size: 14px;
+  text-align: right;
+  min-width: 80px;
+}
+
 .vc-row {
   display: flex;
   gap: 8px;
@@ -104,6 +127,31 @@ html, body {
   justify-content: center;
 }
 .vc-label { width: 100px; text-align: right; }
+
+/* Compact controls for mobile */
+@media (max-width: 768px) {
+  .voice-controls {
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .vc-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .vc-label {
+    text-align: left;
+    font-size: 12px;
+    min-width: auto;
+  }
+
+  #uiPitch {
+    width: 100%;
+  }
+}
 
 /* 麦克风监听：默认隐藏，由 JS 控制显示 */
 #micMonitor {
@@ -114,41 +162,95 @@ html, body {
 
 /* 气泡容器与气泡 */
 #bubbleContainer {
-  position: relative;
-  min-height: 60vh;
-  padding: 8px;
-  margin-top: 120px; /* 给上方控件留空间 */
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw; /* Full screen width */
+  height: 100vh; /* Full screen height */
   overflow: hidden;
+  z-index: 1;
 }
 
+/* Uniform bubble appearance */
 .bubble {
   position: absolute;
-  max-width: 60ch;
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: rgba(255,255,255,0.9);
-  color: #1b1b1b;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
-  border: 1px solid rgba(0,0,0,0.06);
+  width: 50px; /* Uniform size */
+  height: 50px; /* Uniform size */
+  border-radius: 50%; /* Make bubbles circular */
+  background: rgba(255, 255, 255, 0.9);
+  color: transparent; /* Hide text initially */
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(0, 0, 0, 0.06);
   user-select: none;
   pointer-events: auto;
   font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition: transform 0.5s ease, background 0.5s ease, width 0.5s ease, height 0.5s ease;
 }
+
+/* Neutral, do not resize on :hover (JS will do precise sizing) */
 .bubble:hover {
-  transform: scale(1.06);
+  transform: none;            /* keep position stable */
+  /* no width/height changes here */
 }
 
-/* 音频播放按钮（泡泡内） */
-.audio-btn {
-  margin-top: 6px;
-  padding: 6px 10px;
-  border-radius: 10px;
-  border: 1px solid #ddd;
-  background: #f7f7f7;
-  cursor: pointer;
+/* Hide content by default; JS toggles .bubble--open to reveal */
+.bubble div,
+.bubble audio {
+  display: none;
 }
 
-/* 漂浮动画（left/top 分离，避免覆盖 transform） */
+/* Content wrapper used for sizing */
+.bubble-content {
+  display: none;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* During measuring: participate in layout but stay invisible (no flicker) */
+.bubble--measuring .bubble-content {
+  display: block;
+  visibility: hidden;
+}
+/* Ensure all children (text/audio) also layout during measuring */
+.bubble--measuring .bubble-content * {
+  display: block !important;
+  visibility: hidden !important;
+}
+
+/* Open state: show content and apply readable box look */
+.bubble--open {
+  border-radius: 16px !important;
+  padding: 16px !important;
+  background: rgba(255,255,255,1) !important;
+  color: #1b1b1b !important;
+  z-index: 1000 !important;
+  display: block !important;
+  overflow: auto !important;
+  max-width: 90vw !important;
+  max-height: 90vh !important;
+}
+.bubble--open .bubble-content {
+  display: block;
+  visibility: visible;
+}
+.bubble--open .bubble-content * {
+  display: block !important;
+  visibility: visible !important;
+}
+.bubble--open audio {
+  display: block;
+  margin-top: 10px;
+}
+
+/* Remove previous hover content display rules if any */
+/* .bubble:hover div, .bubble:hover audio { ... } intentionally omitted/replaced */
+
+/* Adjust floating animation for uniform bubbles */
 @keyframes floatX { from { left: var(--x0); } to { left: var(--x1); } }
 @keyframes floatY { from { top: var(--y0); } to { top: var(--y1); } }
 .bubble.float {
@@ -172,4 +274,181 @@ html, body {
   }
   .vc-label { width: 84px; }
   .bubble { font-size: 12px; max-width: 46ch; }
+}
+
+/* Small screen optimizations */
+@media (max-width: 768px) {
+  /* Adjust controls for smaller screens */
+  #controls {
+    top: 30%;
+    width: 90%;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 16px;
+  }
+  #controls input[type="text"], #controls button {
+    width: 100%;
+    height: 36px;
+    font-size: 14px;
+    padding: 6px 10px;
+  }
+
+  /* Adjust voice controls */
+  .voice-controls {
+    margin: 40px auto 8px;
+    padding-top: 40px; /* Avoid overlap with navbar */
+    gap: 12px;
+  }
+  .vc-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .vc-label {
+    width: auto;
+    text-align: left;
+    font-size: 14px;
+  }
+
+  /* Adjust bubble container */
+  #bubbleContainer {
+    margin-top: 100px; /* Leave space for controls */
+    padding: 6px;
+  }
+  .bubble {
+    font-size: 12px;
+    max-width: 90%;
+    padding: 8px 10px;
+  }
+
+  /* Adjust mic monitor */
+  #micMonitor {
+    width: 100%;
+    margin: 12px auto 0;
+  }
+}
+
+@media (max-width: 420px) {
+  /* Further adjustments for very small screens */
+  #controls {
+    top: 35%;
+    gap: 6px;
+    padding: 10px 12px;
+  }
+  #controls input[type="text"], #controls button {
+    height: 32px;
+    font-size: 12px;
+    padding: 4px 8px;
+  }
+  .vc-label {
+    font-size: 12px;
+  }
+  .bubble {
+    font-size: 10px;
+    max-width: 80%;
+  }
+  .vc-label {
+    font-size: 10px;
+  }
+
+  .vc-row {
+    gap: 4px;
+  }
+
+  #uiPitch {
+    width: 100%;
+  }
+}
+
+/* Modern thin range slider for #uiPitch */
+#uiPitch {
+  --p: 50%; /* progress (JS updates) */
+  --accent: #6b8cff;
+  --track: rgba(0,0,0,0.12);
+  --track-bg: #eaeaea;
+  --glow: rgba(107,140,255,0.5);
+
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 28px;          /* control box height; track itself is thin */
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+}
+
+/* WebKit track with dynamic filled gradient */
+#uiPitch::-webkit-slider-runnable-track {
+  height: 4px;          /* thin track */
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, var(--accent) 0 var(--p), var(--track-bg) var(--p) 100%);
+  box-shadow: inset 0 0 0 1px var(--track);
+}
+
+/* WebKit thumb */
+#uiPitch::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;      /* centers thumb on 4px track (16/2 - 4/2) */
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 30%, #ffffff 0 35%, #f2f4ff 36% 60%, #dfe5ff 61% 100%);
+  border: 2px solid #ffffff;
+  box-shadow:
+    0 2px 8px rgba(0,0,0,0.15),
+    0 0 0 6px var(--glow);
+  transition: transform .15s ease, box-shadow .2s ease;
+}
+#uiPitch:hover::-webkit-slider-thumb {
+  transform: scale(1.06);
+  box-shadow:
+    0 2px 10px rgba(0,0,0,0.18),
+    0 0 0 8px var(--glow);
+}
+#uiPitch:active::-webkit-slider-thumb {
+  transform: scale(0.98);
+}
+
+/* Firefox track and progress */
+#uiPitch::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--track-bg);
+  box-shadow: inset 0 0 0 1px var(--track);
+}
+#uiPitch::-moz-range-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+/* Firefox thumb */
+#uiPitch::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  background:
+    radial-gradient(circle at 30% 30%, #ffffff 0 35%, #f2f4ff 36% 60%, #dfe5ff 61% 100%);
+  box-shadow:
+    0 2px 8px rgba(0,0,0,0.15),
+    0 0 0 6px var(--glow);
+  transition: transform .15s ease, box-shadow .2s ease;
+}
+#uiPitch:hover::-moz-range-thumb {
+  transform: scale(1.06);
+  box-shadow:
+    0 2px 10px rgba(0,0,0,0.18),
+    0 0 0 8px var(--glow);
+}
+#uiPitch:active::-moz-range-thumb {
+  transform: scale(0.98);
+}
+
+/* Focus ring */
+#uiPitch:focus-visible {
+  outline: none;
 }
