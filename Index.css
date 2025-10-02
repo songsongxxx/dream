@@ -1,270 +1,131 @@
-@font-face {
-  font-family: 'Dreamer TM';
-  src: url('./dreamimages/Dreamer TM.otf') format('opentype');
-  font-weight: normal;
-  font-style: normal;
+/* ===== Fullscreen embed reset ===== */
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  background: #000;            /* behind the game */
+  color: #eaeaf0;
+  font: 500 16px/1.6 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  overflow: hidden;             /* no scrollbars; true fullscreen */
 }
 
-@font-face {
-  font-family: 'PencilPete';
-  src: url('PencilPete TRIAL/PencilPeteFONT.woff2') format('woff2');
-  font-weight: normal;
-  font-style: normal;
+/* If you had wrappers like .page / .intro-embed, make them fill the screen */
+.page,
+.intro-embed,
+.game-shell {
+  height: 100%;
+  width: 100%;
+  margin: 0;
 }
 
-@font-face {
-  font-family: 'StarryFonts';
-  src: url('https://raw.githubusercontent.com/songsongxxx/qqspace/main/fontsassets/starry_fonts.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
+/* ===== The game ===== */
+.game-wrap {
+  position: fixed;              /* pin to the viewport */
+  inset: 0;                     /* top/right/bottom/left = 0 */
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+  overflow: hidden;
 }
 
-@font-face {
-  font-family: 'Inkdrop';
-  src: url('https://raw.githubusercontent.com/songsongxxx/qqspace/main/fontsassets/inkdrop.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-}
-
-html, body, * {
-  font-family: 'Dreamer TM', sans-serif !important;
-  letter-spacing: 0.16em;
-}
-#loader {
-  position: fixed;
+/* The iframe is the game. Fill the viewport. */
+.game-wrap iframe {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
-  background: #000;
-  color: white;
-  font-family: monospace;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  transition: opacity 0.5s;
+  border: 0;
+  pointer-events: none;
 }
 
-
-@font-face {
-  font-family: 'PencilPete';
-  src: url('PencilPete TRIAL/PencilPeteFONT.woff2') format('woff2');
-  font-weight: normal;
-  font-style: normal;
+/* ===== Loader overlay ===== */
+.loader {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 12px;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(3px);
+  z-index: 2;
+  transition: opacity .2s ease;
 }
+.loader.hidden { opacity: 0; pointer-events: none; }
 
-@font-face {
-  font-family: 'StarryFonts';
-  src: url('https://raw.githubusercontent.com/songsongxxx/qqspace/main/fontsassets/starry_fonts.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
+.spinner {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,.25);
+  border-top-color: #9aa0ff;
+  animation: spin 1s linear infinite;
+  margin: 0 auto;
 }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-@font-face {
-  font-family: 'Inkdrop';
-  src: url('https://raw.githubusercontent.com/songsongxxx/qqspace/main/fontsassets/inkdrop.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-}
-
-body {
-  background-color: #f1f1f1;
-  text-align: center;
+.loader-text {
   margin: 0;
-  padding: 0;
+  text-align: center;
+  color: #a7a9b4;
 }
 
-#game-container {
-    position: relative;
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 20px;
-}
-
-#story-container {
-    position: relative;
-    min-height: 500px;
-  }
-  
-
-/* 图片样式，留白+圆角 */
-#scene-image {
-    max-width: 90%;
-    height: auto;
-    border-radius: 16px;
-    margin-top: 1rem;
-    box-shadow: 0 0 12px rgba(0, 0, 0, 0.2);
-    background-color: #111111; /* 深色背景防止闪白 */
-    object-fit: cover;
-    transition: opacity 0.5s ease;
-  
-    /* ✅ 关键：保证居中 */
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
-  }
-  @media (max-width: 768px) {
-    #scene-image {
-      max-width: 85%;
-      border-radius: 12px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.18);
-    }
-  }
-  @media (max-width: 480px) {
-    #scene-image {
-      max-width: 75%;
-      border-radius: 8px;
-      box-shadow: 0 0 8px rgba(0, 0, 0, 0.15);
-    }
-  }
-  
-/* 对话文字风格 */
-/* 对话文字风格 */
-#story-text {
-  font-size: 1rem;
-  background: rgba(255, 255, 255, 0.3); /* 轻透背景 */
-  border: 1px dashed #999; /* ✅ 保留 */
-  border-radius: 12px;
-  padding: 0.7rem;
-  margin-top: 1rem;
-  backdrop-filter: blur(20px);
-  color: #222;
-  box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
-  display: block;
-  max-width: 80%;
-  margin-left: auto;
-  margin-right: auto;
-}
-  /* ✅ 平板适配 */
-@media (max-width: 768px) {
-    #story-text {
-      max-width: 85%;
-      font-size: 0.8rem;
-      border-radius: 10px;
-    }
-  }
-  /* ✅ 手机适配 */
-  @media (max-width: 480px) {
-    #story-text {
-      max-width: 90%;
-      font-size: 0.7rem;
-      border-radius: 8px;
-      padding: 0.8rem;
-    }
-  }
-
-
-  #next-button:hover {
-    background: transparent;
-    transform: translateY(-2px);
-  }
-
-  /* 淡入淡出动画（给文字和图片用） */
-#scene-image, #story-text {
-    transition: opacity 1s ease;
-  }
-  
-
-/* 清除所有 button 的边框和背景 */
-button {
-  border: none;         /* 去掉边框 */
-  background: none;     /* 去掉背景 */
-  box-shadow: none;     /* 去掉阴影 */
-  padding: 0.6rem 1.2rem;
-  margin-top: 1rem;
-  font-size: 1rem;
-  color: #333;
+/* ===== “Click to start” overlay ===== */
+.focus-overlay {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: clamp(220px, 40vw, 420px);
+  height: 56px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  font: 700 16px/56px inherit;
+  letter-spacing: .2px;
   cursor: pointer;
-  transition: 0.3s ease;
+  backdrop-filter: blur(8px);
+  z-index: 3;
+  transition: opacity .2s ease, transform .15s ease;
+}
+.focus-overlay:hover { transform: translateY(-1px); }
+.focus-overlay:active { transform: translateY(0) scale(.99); }
+.focus-overlay.hidden { opacity: 0; pointer-events: none; }
+
+/* Raise overlays above everything */
+.loader { z-index: 9000; }
+.focus-overlay { z-index: 10000; }
+
+/* ===== On-top controls (e.g., Fullscreen button) ===== */
+.controls {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 4;
+  display: flex;
+  gap: 10px;
 }
 
-/* 鼠标悬停时不要出现背景变化 */
-button:hover {
-    transform: translateY(-2px);
-    background: none;
+.btn {
+  appearance: none;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background .15s ease, transform .15s ease, border-color .15s ease;
 }
+.btn:hover { background: rgba(255,255,255,0.12); transform: translateY(-1px); }
+.btn:active { transform: translateY(0) scale(.99); }
 
- /* 确保 HTML/CSS 背景为透明 */
-canvas {
-    background-color: transparent !important;
-  }
-  
-  #glb-button-container {
-    background: transparent;
-    margin: 0rem auto 0 auto;  /* 顶部空间小一些 */
-  }
-  
-  @media (max-width: 480px) {
-    #glb-button-container {
-      width: 300px;
-      height: 300px;
-      margin: 0rem auto 0 auto;  /* 顶部空间小一些 */
-      background: transparent;
-    }
-  
-    #next-button {
-      margin-top: 0.5rem; /* 让按钮和模型靠近些 */
-      font-size: 0.8rem;
-    }
-  }
-
-  #interaction-zone {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-top: 0rem;
+/* Accessibility & motion */
+.focus-overlay:focus-visible,
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(154,160,255,0.65);
 }
-
-@media (max-width: 480px) {
-    #interaction-zone {
-        margin-top: -10rem;
-    }
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: none; }
+  .loader, .focus-overlay { transition: none; }
 }
-
-
-@media (max-width: 375px) {
-  #toneControls {
-    position: absolute;
-    top: 70%;
-    left: 50%;
-    transform: translate(-50%, -50%) scale(0.5);
-    width: 180px;
-    padding: 8px 10px;
-    border-radius: 30px;
-    background: rgba(255, 255, 255, 0.7);
-    box-shadow:
-      0 4px 10px rgba(0, 0, 0, 0.1),
-      inset 0 0 6px rgba(255, 255, 255, 0.5);
-    backdrop-filter: blur(10px);
-    font-size: 10px;
-    color: #333;
-  }
-
-  #toneControls label {
-    font-size: 10px;
-    margin-bottom: 4px;
-    display: block;
-  }
-
-  #toneControls input[type="range"] {
-    width: 100%;
-    height: 4px;
-    margin-top: 2px;
-    margin-bottom: 8px;
-    background: #ffeefc;
-    border-radius: 20px;
-    box-shadow: inset 0 0 2px rgba(255, 153, 204, 0.2);
-  }
-
-  #toneControls input[type="range"]::-webkit-slider-thumb {
-    width: 10px;
-    height: 10px;
-    background: #ffb6f2;
-    border-radius: 50%;
-    cursor: pointer;
-    box-shadow:
-      0 0 3px #ff8bd8,
-      0 0 6px #fff inset;
-  }
-}
-
-  
