@@ -1,12 +1,21 @@
+@font-face {
+  font-family: "smalle";
+  src: url("dreamimages/smalle.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+
 /* Reset / page layout */
 * { box-sizing: border-box; }
 
 html, body {
   height: 100%;
   margin: 0;
-  background: #000;
-  color: #eaeaf0;
-  font: 500 16px/1.6 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: #e5e5e5e0;
+  color: #7f9aca;
+  font-family: "smalle", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  font-size: 19px;
+  line-height: 1.6;
   overflow: hidden; /* no page scrollbars */
 }
 
@@ -77,14 +86,16 @@ html, body {
   border-radius: 999px;
   background: rgba(255,255,255,0.12);
   color: #fff;
-  font: 700 16px/56px inherit;
+  font-family: "smalle", sans-serif;
+  font-size: 20px;
+  font: 700 20px/60px inherit;
   letter-spacing: .2px;
   cursor: pointer;
   backdrop-filter: blur(8px);
   z-index: 10000;
   transition: opacity .2s ease, transform .15s ease;
 }
-.focus-overlay:hover { transform: translateY(-1px); }
+.focus-overlay:hover { background: rgba(175, 197, 222, 0.846); transform: translateY(-2px); }
 .focus-overlay:active { transform: translateY(0) scale(.99); }
 .focus-overlay.hidden { opacity: 0; pointer-events: none; }
 
@@ -97,15 +108,17 @@ html, body {
 }
 .btn {
   appearance: none;
-  border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(255,255,255,0.08);
-  color: #fff;
+  border: 1px solid rgba(107, 108, 173, 0.503);
+  background: rgba(156, 157, 199, 0.13);
+  color: #201f1e;
   padding: 10px 14px;
   border-radius: 12px;
+  font-family: "smalle", sans-serif;
+  font-size: 17px;
   cursor: pointer;
   transition: background .15s ease, transform .15s ease, border-color .15s ease;
 }
-.btn:hover { background: rgba(255,255,255,0.12); transform: translateY(-1px); }
+.btn:hover { background: rgba(165, 204, 233, 0.88); transform: translateY(-2px); }
 .btn:active { transform: translateY(0) scale(.99); }
 
 /* Accessibility */
