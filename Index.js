@@ -1,6 +1,6 @@
 // ===== Config =====
 const INTRO_REDIRECT_URL = "/main";
-const NATIVE_W = 1290;
+const NATIVE_W = 1280;
 const NATIVE_H = 720;
 
 // ===== Elements =====
