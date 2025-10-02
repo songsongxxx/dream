@@ -21,18 +21,21 @@ html, body {
 
 /* ===== The game ===== */
 .game-wrap {
-  position: fixed;              /* pin to the viewport */
-  inset: 0;                     /* top/right/bottom/left = 0 */
-  width: 100vw;
-  height: 100vh;
+  position: relative;
+  margin: auto;
+  width: 90vw;             /* take up 90% of screen width */
+  max-width: 1290px;       /* don’t exceed your game’s native resolution */
+  aspect-ratio: 1290 / 720; /* keep correct ratio */
   background: #000;
+  border-radius: 12px;     /* optional rounded edges */
   overflow: hidden;
+  box-shadow: 0 0 40px rgba(0,0,0,0.6);
+  top: 50%;
+  transform: translateY(-50%); /* vertical centering */
 }
 
-/* The iframe is the game. Fill the viewport. */
+/* The iframe fills the container (not the whole page) */
 .game-wrap iframe {
-  position: absolute;
-  inset: 0;
   width: 100%;
   height: 100%;
   border: 0;
