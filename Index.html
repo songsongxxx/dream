@@ -4,41 +4,43 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Your Site — Intro</title>
-<link rel="stylesheet" href="Index.css">
-<script src="Index.js" defer></script>
+  <link rel="stylesheet" href="Index.css">
+  <script src="Index.js" defer></script>
 </head>
 <body>
   <main class="page">
     <section class="intro-embed" aria-label="Interactive intro">
       <div class="game-shell">
-        <div class="game-wrap" data-aspect="16/9">
+        <div class="game-wrap">
+          <!-- NOTE: we DO NOT set src yet; we set it after the click -->
           <iframe
             id="introGame"
-            src="intro/"
+            class="scaled-iframe"
+            src="about:blank"
+            data-src="intro/"   <!-- change if your folder is different -->
             title="Intro"
             allow="fullscreen; gamepad"
             allowfullscreen
           ></iframe>
 
-          <!-- Loader shown until the iframe loads -->
-          <div class="loader" id="loader" aria-hidden="true">
-            <div class="spinner" aria-hidden="true"></div>
-            <p class="loader-text">Loading…</p>
-          </div>
-
-          <!-- Focus overlay: click or press Enter/Space to focus iframe -->
+          <!-- Click-to-start overlay (visible by default) -->
           <button id="focusOverlay" class="focus-overlay" aria-label="Click to start the intro">
             Click to start
           </button>
+
+          <!-- Loader (hidden until you click, then shown until game finishes loading) -->
+          <div class="loader hidden" id="loader" aria-hidden="true">
+            <div class="spinner" aria-hidden="true"></div>
+            <p class="loader-text">Loading…</p>
+          </div>
         </div>
 
+        <!-- Fullscreen button, always visible bottom-right -->
         <div class="controls">
           <button id="btnFullscreen" class="btn">Fullscreen</button>
         </div>
       </div>
     </section>
   </main>
-
-  <script src="Index.js"></script>
 </body>
 </html>

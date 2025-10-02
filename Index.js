@@ -1,56 +1,62 @@
 // ===== Config =====
-const INTRO_REDIRECT_URL = "/main"; // your main page
+const INTRO_REDIRECT_URL = "/main";
+const NATIVE_W = 1290;
+const NATIVE_H = 720;
 
-// ===== DOM =====
-const iframe       = document.getElementById("introGame");
-const loader       = document.getElementById("loader");
-const focusOverlay = document.getElementById("focusOverlay");
-const btnFullscreen= document.getElementById("btnFullscreen");
+// ===== Elements =====
+const wrap          = document.querySelector(".game-wrap");
+const iframe        = document.getElementById("introGame");
+const loader        = document.getElementById("loader");
+const focusOverlay  = document.getElementById("focusOverlay");
+const btnFullscreen = document.getElementById("btnFullscreen");
 
-// Make sure DOM is ready (works with/without `defer`)
+// Scale the native 1290x720 game to fit the .game-wrap box
+function scaleIframeToFit() {
+  if (!wrap || !iframe) return;
+  const w = wrap.clientWidth;
+  const h = wrap.clientHeight;
+  const scale = Math.min(w / NATIVE_W, h / NATIVE_H);
+  iframe.style.transform = `translate(-50%, -50%) scale(${scale})`;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+  // Center/scale initially and when the box changes
+  const ro = new ResizeObserver(scaleIframeToFit);
+  if (wrap) ro.observe(wrap);
+  window.addEventListener("resize", scaleIframeToFit);
+  window.addEventListener("orientationchange", scaleIframeToFit);
+  scaleIframeToFit();
 
-  // When game iframe finishes loading, show the focus overlay
-  iframe.addEventListener("load", () => {
-    loader?.classList.add("hidden");
-    focusOverlay?.classList.remove("hidden");
-  });
+  // Start ONLY after clicking: set the iframe src on click
+  async function startGame() {
+    // Hide the button, show the loader
+    focusOverlay?.classList.add("hidden");
+    loader?.classList.remove("hidden");
 
-  function activateGameFocus() {
-    if (!focusOverlay) return;
-    // hide overlay
-    focusOverlay.classList.add("hidden");
-    // let the iframe receive input
-    iframe.style.pointerEvents = "auto";
-    // move keyboard focus inside the game
-    try { iframe.contentWindow?.focus(); } catch {}
+    // Set the real src now (this is when the game actually starts loading)
+    const url = iframe.getAttribute("data-src");
+    if (!url) return;
+    // Wait for the load to complete before enabling interaction
+    iframe.addEventListener("load", () => {
+      loader?.classList.add("hidden");
+      // allow interaction + focus the game
+      iframe.style.pointerEvents = "auto";
+      try { iframe.contentWindow?.focus?.(); } catch {}
+      scaleIframeToFit();
+    }, { once: true });
+    iframe.setAttribute("src", url);
   }
 
-  // Click on the overlay button
-  focusOverlay?.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    activateGameFocus();
-  });
-
-  // Press Enter/Space to activate
+  // Click / keyboard to start
+  focusOverlay?.addEventListener("click", startGame);
   focusOverlay?.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      activateGameFocus();
+      startGame();
     }
   });
 
-  // Safety: if the user clicks anywhere on the page, also activate
-  document.addEventListener("click", (e) => {
-    // If overlay is visible, consume the first click and activate
-    if (!focusOverlay?.classList.contains("hidden")) {
-      e.preventDefault();
-      activateGameFocus();
-    }
-  }, { capture: true });
-
-  // Listen for "intro finished" from the game
+  // Listen for "intro finished" → redirect
   window.addEventListener("message", (e) => {
     const data = e?.data;
     if (!data || typeof data !== "object") return;
@@ -62,13 +68,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Fullscreen toggle
   btnFullscreen?.addEventListener("click", async () => {
-    const wrap = document.querySelector(".game-wrap");
-    if (!wrap) return;
     try {
       if (document.fullscreenElement) await document.exitFullscreen();
       else await wrap.requestFullscreen();
-    } catch (err) {
-      console.warn("Fullscreen not available:", err);
-    }
+    } catch (err) { console.warn("Fullscreen not available:", err); }
   });
 });

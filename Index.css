@@ -1,48 +1,49 @@
-/* ===== Fullscreen embed reset ===== */
+/* Reset / page layout */
 * { box-sizing: border-box; }
 
 html, body {
   height: 100%;
   margin: 0;
-  background: #000;            /* behind the game */
+  background: #000;
   color: #eaeaf0;
   font: 500 16px/1.6 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  overflow: hidden;             /* no scrollbars; true fullscreen */
+  overflow: hidden; /* no page scrollbars */
 }
 
-/* If you had wrappers like .page / .intro-embed, make them fill the screen */
-.page,
-.intro-embed,
-.game-shell {
-  height: 100%;
-  width: 100%;
-  margin: 0;
+/* Perfect centering of the game block */
+.page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;     /* centers horizontally & vertically */
 }
 
-/* ===== The game ===== */
+/* Game container: sized to always fit desktop screens.
+   - Max width: 1100px (smaller than native 1290 to guarantee fit)
+   - Also constrained by viewport: <= 80vw and <= 80vh */
 .game-wrap {
   position: relative;
-  margin: auto;
-  width: 90vw;             /* take up 90% of screen width */
-  max-width: 1290px;       /* don’t exceed your game’s native resolution */
-  aspect-ratio: 1290 / 720; /* keep correct ratio */
+  width: min(80vw, 1100px, calc(80vh * 1290 / 720));
+  aspect-ratio: 1290 / 720;   /* keep correct ratio */
   background: #000;
-  border-radius: 12px;     /* optional rounded edges */
   overflow: hidden;
-  box-shadow: 0 0 40px rgba(0,0,0,0.6);
+  border-radius: 14px;
+  box-shadow: 0 0 30px rgba(0,0,0,0.6);
+}
+
+/* The iframe renders at native size; we scale it to fit .game-wrap */
+.scaled-iframe {
+  position: absolute;
+  left: 50%;
   top: 50%;
-  transform: translateY(-50%); /* vertical centering */
-}
-
-/* The iframe fills the container (not the whole page) */
-.game-wrap iframe {
-  width: 100%;
-  height: 100%;
+  width: 1290px;                 /* native game width */
+  height: 720px;                 /* native game height */
   border: 0;
-  pointer-events: none;
+  transform-origin: center center;
+  transform: translate(-50%, -50%) scale(1); /* centered even before JS scales it */
+  pointer-events: none;          /* block interaction until we start */
 }
 
-/* ===== Loader overlay ===== */
+/* Loader overlay */
 .loader {
   position: absolute;
   inset: 0;
@@ -51,29 +52,21 @@ html, body {
   gap: 12px;
   background: rgba(0,0,0,0.55);
   backdrop-filter: blur(3px);
-  z-index: 2;
+  z-index: 9000;
   transition: opacity .2s ease;
 }
 .loader.hidden { opacity: 0; pointer-events: none; }
-
 .spinner {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  width: 36px; height: 36px; border-radius: 50%;
   border: 3px solid rgba(255,255,255,.25);
   border-top-color: #9aa0ff;
   animation: spin 1s linear infinite;
   margin: 0 auto;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+.loader-text { margin: 0; text-align: center; color: #a7a9b4; }
 
-.loader-text {
-  margin: 0;
-  text-align: center;
-  color: #a7a9b4;
-}
-
-/* ===== “Click to start” overlay ===== */
+/* Focus overlay */
 .focus-overlay {
   position: absolute;
   inset: 0;
@@ -82,33 +75,26 @@ html, body {
   height: 56px;
   border: 0;
   border-radius: 999px;
-  background: rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.12);
   color: #fff;
   font: 700 16px/56px inherit;
   letter-spacing: .2px;
   cursor: pointer;
   backdrop-filter: blur(8px);
-  z-index: 3;
+  z-index: 10000;
   transition: opacity .2s ease, transform .15s ease;
 }
 .focus-overlay:hover { transform: translateY(-1px); }
 .focus-overlay:active { transform: translateY(0) scale(.99); }
 .focus-overlay.hidden { opacity: 0; pointer-events: none; }
 
-/* Raise overlays above everything */
-.loader { z-index: 9000; }
-.focus-overlay { z-index: 10000; }
-
-/* ===== On-top controls (e.g., Fullscreen button) ===== */
+/* Fullscreen button: fixed bottom-right */
 .controls {
   position: fixed;
   right: 16px;
   bottom: 16px;
-  z-index: 4;
-  display: flex;
-  gap: 10px;
+  z-index: 11000;
 }
-
 .btn {
   appearance: none;
   border: 1px solid rgba(255,255,255,0.14);
@@ -122,7 +108,7 @@ html, body {
 .btn:hover { background: rgba(255,255,255,0.12); transform: translateY(-1px); }
 .btn:active { transform: translateY(0) scale(.99); }
 
-/* Accessibility & motion */
+/* Accessibility */
 .focus-overlay:focus-visible,
 .btn:focus-visible {
   outline: none;
