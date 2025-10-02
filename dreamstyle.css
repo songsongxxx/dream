@@ -5,8 +5,16 @@
   font-style: normal;
 }
 
+@font-face {
+  font-family: "smalle";
+  src: url("dreamimages/smalle.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+
 body, html, * {
-  font-family: 'Dreamer TM', sans-serif !important;
+  font-family: 'smalle', sans-serif !important;
+  font-size: 20px;
   letter-spacing: 0.2em;
 }
 /* 全局样式 */
@@ -85,7 +93,7 @@ html, body {
 #controls button { cursor: pointer; }
 #controls button:hover {
   transform: scale(1.02);
-  background: rgba(255,255,255,0.75);
+  background: rgba(169, 188, 221, 0.75);
 }
 
 /* 语音参数区 */
