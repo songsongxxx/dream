@@ -22,7 +22,7 @@ html, body {
    - Also constrained by viewport: <= 80vw and <= 80vh */
 .game-wrap {
   position: relative;
-  width: min(80vw, 1100px, calc(80vh * 1290 / 720));
+  width: min(90vw, 1200px, calc(90vh * 1290 / 720));
   aspect-ratio: 1290 / 720;   /* keep correct ratio */
   background: #000;
   overflow: hidden;
