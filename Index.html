@@ -12,19 +12,21 @@
     <section class="intro-embed" aria-label="Interactive intro">
       <div class="game-shell">
         <div class="game-wrap">
+
           <!-- NOTE: we DO NOT set src yet; we set it after the click -->
+          <!-- change data-src below if your folder is different -->
           <iframe
             id="introGame"
             class="scaled-iframe"
             src="about:blank"
-            data-src="intro/"   <!-- change if your folder is different -->
+            data-src="intro/"
             title="Intro"
             allow="fullscreen; gamepad"
             allowfullscreen
           ></iframe>
 
           <!-- Click-to-start overlay (visible by default) -->
-          <button id="focusOverlay" class="focus-overlay" aria-label="Click to start the intro">
+          <button id="focusOverlay" class="focus-overlay" aria-label="Click to start the intro" type="button">
             Click to start
           </button>
 
@@ -37,9 +39,44 @@
 
         <!-- Fullscreen button, always visible bottom-right -->
         <div class="controls">
-          <button id="btnFullscreen" class="btn">Fullscreen</button>
+          <button id="btnFullscreen" class="btn" type="button">Fullscreen</button>
         </div>
       </div>
+
+      <!-- Side UI rail (icons + bubbles) -->
+      <aside class="side-rail" aria-label="Helper buttons">
+        <!-- Help / Instructions Tool -->
+        <div class="side-rail-tool">
+          <button id="btnHelp" class="icon-btn" aria-expanded="false" aria-controls="bubbleHelp" type="button">
+            <img src="dreamimages/icon-help.png" alt="Help" />
+          </button>
+          <div id="bubbleHelp" class="speech-bubble" role="dialog" aria-labelledby="btnHelp" aria-hidden="true">
+            <div class="bubble-inner">
+              <p>W A S D to move</p>
+              <p>Spacebar to confirm</p>
+              <p>or</p>
+              <p>Left click for everything</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Music / Credits Tool -->
+        <div class="side-rail-tool">
+          <button id="btnMusic" class="icon-btn" aria-expanded="false" aria-controls="bubbleMusic" type="button">
+            <img src="dreamimages/icon-music.png" alt="Music & credits" />
+          </button>
+          <div id="bubbleMusic" class="speech-bubble" role="dialog" aria-labelledby="btnMusic" aria-hidden="true">
+            <div class="bubble-inner">
+              <p>
+                Music &amp;<br/>sound design<br/>by<br/>
+                <a href="https://apunanu.bandcamp.com/" target="_blank" rel="noopener noreferrer">
+                 Apu Nanu
+                </a><br/>&lt;3
+              </p>
+            </div>
+          </div>
+        </div>
+      </aside>
     </section>
   </main>
 </body>

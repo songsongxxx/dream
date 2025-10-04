@@ -74,3 +74,5 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) { console.warn("Fullscreen not available:", err); }
   });
 });
+
+

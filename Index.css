@@ -131,3 +131,106 @@ html, body {
   .spinner { animation: none; }
   .loader, .focus-overlay { transition: none; }
 }
+
+/* === Left rail (fixed near left edge, aligned vertically to game) === */
+.side-rail {
+  position: fixed;
+  /* sit a little inside the left edge; responsive */
+  left: clamp(12px, 3vw, 32px);
+  /* vertically around top-third of the viewport */
+  top: 12vh;
+  display: grid;
+  gap: clamp(22px, 5vh, 48px);
+  z-index: 12000; /* above the game & bubbles */
+  pointer-events: none; /* icons re-enable on themselves */
+}
+
+/* Icon buttons */
+.icon-btn {
+  pointer-events: auto;
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  width: clamp(36px, 3.8vw, 56px);
+  height: clamp(36px, 3.8vw, 56px);
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,.35));
+  cursor: pointer;
+  transition: transform .15s ease, filter .2s ease;
+}
+.icon-btn img { width: 100%; height: 100%; display: block; }
+.icon-btn:hover { transform: translateY(-2px); filter: drop-shadow(0 4px 10px rgba(0,0,0,.45)); }
+.icon-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(154,160,255,0.65); }
+
+/* Speech bubbles (now positioned next to each icon) */
+.speech-bubble {
+  position: absolute;            /* was fixed */
+  left: calc(100% + 12px);       /* pop out to the right of the icon */
+  top: 0;                        /* align to the top of the icon button */
+  width: clamp(180px, 18vw, 280px);
+  transform-origin: 10% 0%;
+  background: #efe9dc;
+  color: #1b1b1b;
+  border-radius: 18px;
+  padding: 16px 18px 18px;
+  box-shadow: 0 12px 28px rgba(0,0,0,.28);
+  font-family: "smalle", sans-serif;
+  line-height: 1.45;
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(.96) translateY(-8px);
+  transition: opacity .18s ease, transform .18s ease, visibility .18s;
+  pointer-events: none;
+  z-index: 13000;
+}
+
+/* little tail */
+.speech-bubble::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 18px;
+  width: 0; height: 0;
+  border-right: 10px solid #efe9dc;
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  filter: drop-shadow(-2px 2px 2px rgba(0,0,0,.15));
+}
+
+
+/* inner content spacing */
+.bubble-inner p {
+  margin: 0 0 8px 0;
+}
+.bubble-inner p:last-child { margin-bottom: 0; }
+
+/* Open state (toggled by JS) */
+.speech-bubble.is-open {
+  opacity: 1;
+  visibility: visible;
+  transform: scale(1) translateY(0);
+  pointer-events: auto;
+}
+
+/* Show bubbles on hover */
+.side-rail-tool:hover .speech-bubble {
+  opacity: 1;
+  visibility: visible;
+  transform: scale(1) translateY(0);
+  pointer-events: auto;
+}
+
+.side-rail-tool { position: relative; }
+
+/* When a bubble is pinned open, slightly highlight its icon */
+.icon-btn[aria-expanded="true"] {
+  transform: translateY(-2px) scale(1.02);
+}
+
+/* Make sure rail doesn't overlap small screens too much */
+@media (max-width: 900px) {
+  .side-rail { top: 6vh; }
+}
