@@ -192,7 +192,7 @@ html, body {
   border-radius: 50%; /* Make bubbles circular */
   background: #fbfbfb; /* Solid white background for correct opacity effect */
   color: transparent; /* Hide text initially */
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 6px 18px 6px rgba(0,0,0,0.10), 0 0 32px 8px rgba(0,0,0,0.08);
   border: 0px solid rgba(0, 0, 0, 0.06);
   user-select: none;
   pointer-events: auto;
