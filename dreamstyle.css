@@ -19,25 +19,21 @@ body, html, * {
 }
 /* 全局样式 */
 
-@font-face {
-  font-family: 'PencilPete';
-  src: url('PencilPete TRIAL/PencilPeteFONT.woff2') format('woff2');
-  font-weight: normal;
-  font-style: normal;
+body {
+  position: relative;
+  min-height: 100vh;
+  /* fallback background color */
+  background: #ececec url('dreamimages/village_by_day.png') center/cover no-repeat;
 }
 
-@font-face {
-  font-family: 'StarryFonts';
-  src: url('https://raw.githubusercontent.com/songsongxxx/qqspace/main/fontsassets/starry_fonts.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: 'Inkdrop';
-  src: url('https://raw.githubusercontent.com/songsongxxx/qqspace/main/fontsassets/inkdrop.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: url('dreamimages/village_by_day.png') center/cover no-repeat;
+  opacity: 0.7; /* Adjust opacity as needed */
+  pointer-events: none;
 }
 
 /* 全局基础 */
@@ -45,7 +41,7 @@ body, html, * {
 html, body {
   margin: 0;
   min-height: 100vh;
-  background: #fefefe;
+  /* background: #fefefe;  Removed to allow body::before image to show */
   color: #1b1b1b;
   font-family: system-ui, "Noto Sans SC", Arial, sans-serif;
   text-align: center;
