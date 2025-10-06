@@ -2,6 +2,12 @@
 const $ = (id) => document.getElementById(id);
 const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwN2_h8gvABFBO4R13BaUMtigofFVRt-CCNy4Fqgl5WjCZZFDZs3xI53eelPe-Sk3eI/exec";
 
+/* Client-side lifetime and split FX configs */
+const BUBBLE_TTL_MS = 30 * 24 * 60 * 60 * 1000;   // 30 days
+const SPLIT_INTERVAL_MS = 25000;                   // every 25s try splitting a bubble
+const SPLIT_DURATION_MS = 3500;                    // one split cycle duration
+const SHARD_COUNT_MIN = 5, SHARD_COUNT_MAX = 9;    // number of shards per split
+
 /* UI 取值 */
 const ui = {
   pitch: () => $('uiPitch'),
@@ -40,14 +46,42 @@ let mediaStreamDest;     // WebAudio MediaStreamDestination
 let rec;                 // MediaRecorder
 let recChunks = [];
 
+/* New: separate stream for the Test Mic monitor (independent of Tone.js chain) */
+let testMicStream = null;
+
+/* New: track Tone mic open state and shared constraints */
+let micOpen = false;
+const defaultMicConstraints = { audio: true };
+
+/* New helpers: reopen/close Tone mic */
+async function ensureMicOpen() {
+  if (micOpen) return;
+  if (!mic) return;
+  try {
+    await mic.open(defaultMicConstraints);
+    micOpen = true;
+    console.log('🎤 Mic opened');
+  } catch (e) {
+    console.warn('Failed to open mic', e);
+  }
+}
+async function closeToneMic() {
+  if (!micOpen || !mic?.close) return;
+  try {
+    await mic.close();
+  } catch (_) {}
+  micOpen = false;
+  console.log('🔇 Mic closed');
+}
+
 async function ensureToneChain() {
   if (toneReady) return;
   await Tone.start();
 
   mic = new Tone.UserMedia();
-  const constraints = { audio: true }; // Always use the default microphone
-  await mic.open(constraints);
-  console.log('🎤 Default mic opened with', constraints);
+  await mic.open(defaultMicConstraints);
+  micOpen = true;
+  console.log('🎤 Default mic opened with', defaultMicConstraints);
 
   // Effects
   pitchShift = new Tone.PitchShift({ pitch: 0, windowSize: 0.1, delayTime: 0.01, feedback: 0 });
@@ -111,6 +145,7 @@ async function unlockAudioContext() {
 async function startRec() {
   await unlockAudioContext();
   await ensureToneChain();
+  await ensureMicOpen(); // New: reopen mic if it was closed
   recChunks = [];
   rec = getRecorderForProcessedStream();
   rec.start();
@@ -133,6 +168,9 @@ async function stopRec() {
   $('recStart').disabled = false;
   $('recStop').disabled  = true;
 
+  // New: also stop/close the Tone.js microphone
+  await closeToneMic();
+
   if (blob.size === 0) {
     console.error('❌ 录音数据为空或损坏');
     return null;
@@ -142,37 +180,54 @@ async function stopRec() {
 
 /* ============ ffmpeg.wasm 转码（仅一份） ============ */
 let ffmpegInstance;
+/* New: remember the core path that matches the loaded ffmpeg.min.js */
+let ffmpegCorePath = null;
+
 async function ensureFfmpegScript() {
-  if (window.FFmpeg?.createFFmpeg) return true;
-  const cdns = [
-    './lib/ffmpeg/ffmpeg.min.js', // 本地优先（建议把文件放到此路径）
+  // If already present, return a usable corePath (fallback to CDN)
+  if (window.FFmpeg?.createFFmpeg) {
+    return ffmpegCorePath || 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/ffmpeg-core.js';
+  }
+  const candidates = [
+    './lib/ffmpeg/ffmpeg.min.js', // Local (if you host files here)
     'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/ffmpeg.min.js',
     'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/ffmpeg.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.12.10/ffmpeg.min.js'
   ];
-  for (const src of cdns) {
+  for (const minSrc of candidates) {
     try {
       await new Promise((res, rej) => {
         const s = document.createElement('script');
-        s.src = src;
+        s.src = minSrc;
+        s.crossOrigin = 'anonymous';
+        s.referrerPolicy = 'no-referrer';
         s.onload = res;
         s.onerror = rej;
         document.head.appendChild(s);
       });
-      if (window.FFmpeg?.createFFmpeg) return true;
-    } catch (_) {}
+      if (window.FFmpeg?.createFFmpeg) {
+        // Derive ffmpeg-core.js from the successful min.js URL
+        const absMin = new URL(minSrc, location.href);
+        const coreAbs = new URL('ffmpeg-core.js', absMin);
+        ffmpegCorePath = coreAbs.href;
+        return ffmpegCorePath;
+      }
+    } catch (_) {
+      // try next candidate
+    }
   }
-  return false;
+  return '';
 }
 
 async function ensureFFmpeg() {
-  const ok = await ensureFfmpegScript();
-  if (!ok) throw new Error('FFmpeg script 加载失败');
+  const corePath = await ensureFfmpegScript();
+  if (!corePath) throw new Error('FFmpeg script 加载失败');
   if (ffmpegInstance) return ffmpegInstance;
   const { createFFmpeg } = window.FFmpeg;
   const ff = createFFmpeg({
     log: false,
-    corePath: new URL('./lib/ffmpeg/ffmpeg-core.js', location.href).href // 本地 core（相对当前页面）
+    /* Updated: use derived corePath instead of always local */
+    corePath
   });
   await ff.load();
   ffmpegInstance = ff;
@@ -263,6 +318,13 @@ function postViaHiddenForm(url, fields) {
     form.submit();
   });
 }
+/* New: lightweight status helper */
+function setStatus(msg) {
+  const el = $('statusMsg');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.style.display = msg ? 'block' : 'none';
+}
 async function submitToGAS({ text = '', audioB64 = '', audioMime = '', filename = '' }) {
   const timestamp = Date.now(); // Add a timestamp for the bubble
   await postViaHiddenForm(WEB_APP_URL, {
@@ -273,19 +335,53 @@ async function submitToGAS({ text = '', audioB64 = '', audioMime = '', filename 
     timestamp // Include the timestamp in the submission
   });
 }
+/* Updated: robust JSONP with unique callback + timeout + cleanup */
 function loadFromGAS() {
-  return new Promise((resolve, reject) => {
-    window.receiveRows = (data) => {
+  return new Promise((resolve) => {
+    const cb = 'receiveRows_' + Date.now();
+    let finished = false;
+
+    function cleanup(scriptEl) {
+      try { delete window[cb]; } catch {}
+      if (scriptEl?.parentNode) scriptEl.parentNode.removeChild(scriptEl);
+    }
+
+    window[cb] = (data) => {
+      if (finished) return;
+      finished = true;
       try {
-        if (!data || !data.ok) throw new Error(data && data.error || 'unknown');
+        if (!data || !data.ok) throw new Error((data && data.error) || 'unknown');
         renderRows(Array.isArray(data.rows) ? data.rows : []);
+        setStatus('');
         resolve(true);
-      } catch (e) { console.error('❌ 数据解析失败：', e); reject(e); }
+      } catch (e) {
+        console.error('❌ 数据解析失败：', e);
+        setStatus('服务不可用（GAS 错误）');
+        resolve(false);
+      } finally {
+        cleanup(scriptEl);
+      }
     };
-    const s = document.createElement('script');
-    s.src = `${WEB_APP_URL}?callback=receiveRows&limit=${LIMIT}&inline=1&_=${Date.now()}`;
-    s.onerror = (e) => { console.error('❌ JSONP 加载失败', e); reject(e); };
-    document.body.appendChild(s);
+
+    const scriptEl = document.createElement('script');
+    scriptEl.src = `${WEB_APP_URL}?callback=${cb}&limit=${LIMIT}&inline=1&_=${Date.now()}`;
+    scriptEl.onerror = () => {
+      if (finished) return;
+      finished = true;
+      setStatus('服务不可用（网络/CORS/403）');
+      cleanup(scriptEl);
+      resolve(false);
+    };
+    document.body.appendChild(scriptEl);
+
+    // Timeout guard
+    setTimeout(() => {
+      if (finished) return;
+      finished = true;
+      setStatus('服务不可用（超时/403）');
+      cleanup(scriptEl);
+      resolve(false);
+    }, 8000);
   });
 }
 
@@ -330,10 +426,288 @@ function guessMimeFromUrl(u) {
 let currentAudio = null;
 let currentBtn = null;
 
+/* Helpers: audio UI builder and content utils */
+function buildCustomAudioControls(audio, contentEl) {
+  // Remove any existing custom UI
+  contentEl.querySelectorAll('.audio-ui').forEach(n => n.remove());
+
+  const aui = document.createElement('div');
+  aui.className = 'audio-ui';
+
+  const playBtn = document.createElement('button');
+  playBtn.className = 'audio-play';
+  playBtn.type = 'button';
+  playBtn.textContent = '▶';
+
+  const progress = document.createElement('input');
+  progress.className = 'audio-progress';
+  progress.type = 'range';
+  progress.min = '0';
+  progress.max = '1';
+  progress.step = '0.01';
+  progress.value = '0';
+  progress.disabled = true;
+
+  const volWrap = document.createElement('div');
+  volWrap.className = 'audio-vol';
+  const volBtn = document.createElement('button');
+  volBtn.className = 'audio-vol-btn';
+  volBtn.type = 'button';
+  volBtn.textContent = '🔊';
+  const vol = document.createElement('input');
+  vol.className = 'audio-volume';
+  vol.type = 'range';
+  vol.min = '0';
+  vol.max = '1';
+  vol.step = '0.01';
+  vol.value = '1';
+  volWrap.appendChild(volBtn);
+  volWrap.appendChild(vol);
+
+  const timeEl = document.createElement('span');
+  timeEl.className = 'audio-time';
+  timeEl.textContent = '00:00 / 00:00';
+
+  aui.appendChild(playBtn);
+  aui.appendChild(progress);
+  aui.appendChild(volWrap);
+  aui.appendChild(timeEl);
+  contentEl.appendChild(aui);
+
+  audio.addEventListener('loadedmetadata', () => {
+    const dur = isFinite(audio.duration) ? audio.duration : 0;
+    progress.max = String(dur || 1);
+    progress.step = '0.01';
+    progress.disabled = !dur;
+    timeEl.textContent = `${formatDuration(0)} / ${formatDuration(dur)}`;
+  });
+
+  audio.addEventListener('timeupdate', () => {
+    if (!progress.disabled) progress.value = String(audio.currentTime || 0);
+    const dur = isFinite(audio.duration) ? audio.duration : 0;
+    timeEl.textContent = `${formatDuration(audio.currentTime || 0)} / ${formatDuration(dur)}`;
+  });
+
+  audio.addEventListener('ended', () => {
+    playBtn.textContent = '▶';
+    playBtn.classList.remove('is-playing');
+    progress.value = '0';
+  });
+
+  function syncVolIcon() {
+    if (audio.muted || +vol.value === 0) {
+      volBtn.textContent = '🔇';
+    } else if (+vol.value < 0.5) {
+      volBtn.textContent = '🔈';
+    } else {
+      volBtn.textContent = '🔊';
+    }
+  }
+  audio.volume = 1;
+  audio.muted = false;
+  syncVolIcon();
+
+  vol.addEventListener('input', () => {
+    const v = parseFloat(vol.value || '0') || 0;
+    audio.volume = v;
+    if (v > 0 && audio.muted) audio.muted = false;
+    syncVolIcon();
+  });
+  volBtn.addEventListener('click', () => {
+    audio.muted = !audio.muted;
+    if (audio.muted) {
+      vol.dataset.prev = vol.value;
+      vol.value = '0';
+    } else {
+      const prev = vol.dataset.prev;
+      if (prev) {
+        vol.value = prev;
+        audio.volume = parseFloat(prev || '0') || 0.5;
+      } else if (+vol.value === 0) {
+        vol.value = '0.5';
+        audio.volume = 0.5;
+      }
+    }
+    syncVolIcon();
+  });
+  audio.addEventListener('volumechange', syncVolIcon);
+
+  playBtn.addEventListener('click', async () => {
+    if (audio.paused) {
+      if (currentAudio && currentAudio !== audio) {
+        try { currentAudio.pause(); } catch {}
+        if (currentBtn) {
+          currentBtn.textContent = '▶';
+          currentBtn.classList.remove('is-playing');
+        }
+      }
+      currentAudio = audio;
+      currentBtn = playBtn;
+      try { await audio.play(); } catch {}
+      playBtn.textContent = '⏸';
+      playBtn.classList.add('is-playing');
+    } else {
+      audio.pause();
+      playBtn.textContent = '▶';
+      playBtn.classList.remove('is-playing');
+    }
+  });
+
+  progress.addEventListener('input', () => {
+    if (!progress.disabled) {
+      audio.currentTime = parseFloat(progress.value || '0') || 0;
+    }
+  });
+
+  return aui;
+}
+function getBubbleText(rec) {
+  const el = rec.element.querySelector('.bubble-text');
+  return el ? (el.textContent || '') : '';
+}
+function getBubbleAudio(rec) {
+  const src = rec.element.querySelector('audio source');
+  if (!src) return null;
+  return { src: src.getAttribute('src') || '', type: src.getAttribute('type') || '' };
+}
+function updateBubbleTypeClass(wrap) {
+  wrap.classList.remove('bubble--text', 'bubble--audio');
+  const hasText = !!wrap.querySelector('.bubble-text');
+  const hasAudio = !!wrap.querySelector('audio');
+  if (hasAudio) wrap.classList.add('bubble--audio');
+  else if (hasText) wrap.classList.add('bubble--text');
+}
+function setBubbleContent(rec, { text, audioSrc, audioType }) {
+  const wrap = rec.element;
+  const contentEl = wrap.querySelector('.bubble-content');
+  if (!contentEl) return;
+
+  // Text update
+  let textEl = contentEl.querySelector('.bubble-text');
+  if (text && text.trim()) {
+    if (!textEl) {
+      textEl = document.createElement('div');
+      textEl.className = 'bubble-text';
+      contentEl.insertBefore(textEl, contentEl.firstChild);
+    }
+    textEl.textContent = text;
+  } else if (textEl) {
+    textEl.remove();
+  }
+
+  // Remove existing audio + custom UI
+  contentEl.querySelectorAll('.audio-ui').forEach(n => n.remove());
+  const oldAudio = contentEl.querySelector('audio');
+  if (oldAudio) oldAudio.remove();
+
+  // Audio update
+  if (audioSrc) {
+    const audio = document.createElement('audio');
+    audio.controls = false;
+    const source = document.createElement('source');
+    source.src = audioSrc;
+    if (audioType) source.type = audioType;
+    audio.appendChild(source);
+    contentEl.appendChild(audio);
+    buildCustomAudioControls(audio, contentEl);
+  }
+
+  // Update type class
+  updateBubbleTypeClass(wrap);
+}
+
+/* Choose a partner to recombine with (prefer same-type) */
+function choosePartner(bubbles, rec) {
+  const candidates = bubbles.filter(b =>
+    b !== rec &&
+    !b.splitting &&
+    !b._hover &&
+    !b.element.classList.contains('bubble--open')
+  );
+  if (!candidates.length) return null;
+
+  const recHasAudio = !!getBubbleAudio(rec);
+  const sameType = candidates.filter(c => !!getBubbleAudio(c) === recHasAudio);
+  const pool = sameType.length ? sameType : candidates;
+  return pool[Math.floor(Math.random() * pool.length)] || null;
+}
+
+/* Recombine text and audio content of two bubbles */
+function recombinePair(aRec, bRec) {
+  // Text recombination
+  const aText = getBubbleText(aRec);
+  const bText = getBubbleText(bRec);
+  let newAText = aText;
+  let newBText = bText;
+  if (aText && bText && aText.length > 1 && bText.length > 1) {
+    const ai = Math.floor(Math.random() * (aText.length - 1)) + 1;
+    const bi = Math.floor(Math.random() * (bText.length - 1)) + 1;
+    newAText = aText.slice(0, ai) + bText.slice(bi);
+    newBText = bText.slice(0, bi) + aText.slice(ai);
+  }
+
+  // Audio recombination (swap/move)
+  const aAud = getBubbleAudio(aRec);
+  const bAud = getBubbleAudio(bRec);
+  let newAAudio = aAud, newBAudio = bAud;
+
+  if (aAud && bAud) {
+    // swap with 50% chance, or keep
+    if (Math.random() < 0.8) { // bias to swap for visible effect
+      newAAudio = bAud;
+      newBAudio = aAud;
+    }
+  } else if (aAud && !bAud) {
+    if (Math.random() < 0.5) { // move from A to B
+      newAAudio = null;
+      newBAudio = aAud;
+    }
+  } else if (!aAud && bAud) {
+    if (Math.random() < 0.5) { // move from B to A
+      newAAudio = bAud;
+      newBAudio = null;
+    }
+  }
+
+  // If the current playing audio is in A/B, pause it before rebuild
+  if (currentAudio) {
+    const aContains = aRec.element.contains(currentAudio);
+    const bContains = bRec.element.contains(currentAudio);
+    if (aContains || bContains) {
+      try { currentAudio.pause(); } catch {}
+      if (currentBtn) {
+        currentBtn.textContent = '▶';
+        currentBtn.classList.remove('is-playing');
+      }
+      currentAudio = null;
+      currentBtn = null;
+    }
+  }
+
+  // Apply updates
+  setBubbleContent(aRec, {
+    text: newAText,
+    audioSrc: newAAudio?.src || '',
+    audioType: newAAudio?.type || ''
+  });
+  setBubbleContent(bRec, {
+    text: newBText,
+    audioSrc: newBAudio?.src || '',
+    audioType: newBAudio?.type || ''
+  });
+}
+
 function renderRows(rows) {
   const container = $('bubbleContainer');
   if (!container) { console.error('❌ Missing #bubbleContainer'); return; }
   container.innerHTML = '';
+
+  // Filter out expired bubbles (older than TTL); data in Drive is unchanged
+  const now = Date.now();
+  const freshRows = (rows || []).filter(r => {
+    const ts = Number(r?.timestamp || 0);
+    return !ts || (now - ts) < BUBBLE_TTL_MS;
+  });
 
   const bubbles = [];
   let screenWidth = window.innerWidth;
@@ -349,6 +723,14 @@ function renderRows(rows) {
     const wrap = document.createElement('div');
     wrap.className = 'bubble';
     wrap.dataset.timestamp = timestamp || Date.now();
+
+    // New: tag bubble type
+    const hasAudio = !!(audioUrl || audioData);
+    if (hasAudio) {
+      wrap.classList.add('bubble--audio');
+    } else if (text) {
+      wrap.classList.add('bubble--text');
+    }
 
     // Assign a random texture overlay
     const randomTexture = textures[Math.floor(Math.random() * textures.length)];
@@ -378,25 +760,34 @@ function renderRows(rows) {
     }
     if (audioUrl || audioData) {
       const audio = document.createElement('audio');
-      audio.controls = true;
+      audio.controls = false; // custom UI
       const source = document.createElement('source');
-      source.src = audioData || normalizeDriveUrl(audioUrl.trim());
-      source.type = audioMime || guessMimeFromUrl(audioUrl);
+      const initialAudioSrc = audioData || normalizeDriveUrl(audioUrl.trim());
+      const initialAudioType = audioMime || guessMimeFromUrl(audioUrl);
+      source.src = initialAudioSrc;
+      source.type = initialAudioType;
       audio.appendChild(source);
       content.appendChild(audio);
+
+      // Refactor: build audio UI via helper
+      buildCustomAudioControls(audio, content);
     }
 
     wrap.appendChild(content);
     container.appendChild(wrap);
 
     // Track this bubble
-    const rec = { element: wrap, x, y, velocityX, velocityY, size: bubbleSize };
+    const rec = { element: wrap, x, y, velocityX, velocityY, size: bubbleSize, splitting: false, _hover: false };
     bubbles.push(rec);
+
+    // Ensure type class is accurate after content is added
+    updateBubbleTypeClass(wrap);
 
     // Pause motion + precisely expand to fit all content on hover
     const initial = { width: bubbleSize, height: bubbleSize };
 
     wrap.addEventListener('mouseenter', () => {
+      rec._hover = true;
       // pause movement
       rec._vx = rec.velocityX; rec._vy = rec.velocityY;
       rec.velocityX = 0; rec.velocityY = 0;
@@ -447,6 +838,7 @@ function renderRows(rows) {
     });
 
     wrap.addEventListener('mouseleave', () => {
+      rec._hover = false;
       // resume movement
       rec.velocityX = rec._vx ?? rec.velocityX;
       rec.velocityY = rec._vy ?? rec.velocityY;
@@ -462,7 +854,8 @@ function renderRows(rows) {
     return wrap;
   };
 
-  rows.forEach(({ text, timestamp, audioUrl, audioMime, audioData }, idx) => {
+  // Use filtered rows (client-side TTL)
+  freshRows.forEach(({ text, timestamp, audioUrl, audioMime, audioData }, idx) => {
     if (!text && !audioUrl && !audioData) return;
     createBubble({ text, timestamp, audioUrl, audioMime, audioData }, idx);
   });
@@ -470,6 +863,9 @@ function renderRows(rows) {
   // Animate bubbles
   function animateBubbles() {
     bubbles.forEach((bubble) => {
+      // Skip movement while splitting
+      if (bubble.splitting) return;
+
       // Update position
       bubble.x += bubble.velocityX;
       bubble.y += bubble.velocityY;
@@ -494,17 +890,110 @@ function renderRows(rows) {
 
   animateBubbles();
 
+  // Periodic split/regroup effect
+  function splitBubble(rec) {
+    if (!rec || rec.splitting) return;
+    if (rec.element.classList.contains('bubble--open') || rec._hover) return;
+
+    rec.splitting = true;
+
+    // pause motion
+    rec._vx = rec.velocityX; rec._vy = rec.velocityY;
+    rec.velocityX = 0; rec.velocityY = 0;
+
+    // Hide original bubble during split
+    const original = rec.element;
+    const prevVis = original.style.visibility;
+    original.style.visibility = 'hidden';
+
+    const centerX = rec.x + rec.size / 2;
+    const centerY = rec.y + rec.size / 2;
+
+    const shardCount = Math.floor(Math.random() * (SHARD_COUNT_MAX - SHARD_COUNT_MIN + 1)) + SHARD_COUNT_MIN;
+    const shards = [];
+    for (let i = 0; i < shardCount; i++) {
+      const shard = document.createElement('div');
+      shard.className = 'bubble-shard';
+      // start at center
+      shard.style.left = `${centerX}px`;
+      shard.style.top = `${centerY}px`;
+      container.appendChild(shard);
+
+      // target direction
+      const angle = Math.random() * Math.PI * 2;
+      const radius = Math.random() * Math.max(40, rec.size / 1.8) + 20;
+      const target = { x: centerX + Math.cos(angle) * radius, y: centerY + Math.sin(angle) * radius };
+      shards.push({ el: shard, start: { x: centerX, y: centerY }, mid: target });
+    }
+
+    const startTime = performance.now();
+    const half = SPLIT_DURATION_MS / 2;
+
+    function animate(now) {
+      const t = now - startTime;
+
+      if (t <= SPLIT_DURATION_MS) {
+        shards.forEach(s => {
+          let x, y;
+          if (t <= half) {
+            // outwards [0..1]
+            const p = t / half;
+            x = s.start.x + (s.mid.x - s.start.x) * p;
+            y = s.start.y + (s.mid.y - s.start.y) * p;
+          } else {
+            // inwards [0..1]
+            const p = (t - half) / half;
+            x = s.mid.x + (s.start.x - s.mid.x) * p;
+            y = s.mid.y + (s.start.y - s.mid.y) * p;
+          }
+          s.el.style.left = `${x}px`;
+          s.el.style.top = `${y}px`;
+        });
+        requestAnimationFrame(animate);
+      } else {
+        // cleanup shards
+        shards.forEach(s => s.el.remove());
+
+        // New: pick a partner and recombine content
+        const partner = choosePartner(bubbles, rec);
+        if (partner) {
+          try { recombinePair(rec, partner); } catch (e) { console.warn('Recombine failed', e); }
+        }
+
+        // restore original bubble
+        original.style.visibility = prevVis || 'visible';
+        // resume motion
+        rec.velocityX = rec._vx ?? rec.velocityX;
+        rec.velocityY = rec._vy ?? rec.velocityY;
+        rec.splitting = false;
+      }
+    }
+    requestAnimationFrame(animate);
+  }
+
+  // Try to split a random bubble at intervals
+  const splitTimer = setInterval(() => {
+    if (!bubbles.length) return;
+    const candidates = bubbles.filter(b => !b.splitting && !b.element.classList.contains('bubble--open') && !b._hover);
+    if (!candidates.length) return;
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    splitBubble(pick);
+  }, SPLIT_INTERVAL_MS);
+
   // Update screen dimensions on resize
   window.addEventListener('resize', () => {
     screenWidth = window.innerWidth;
     screenHeight = window.innerHeight;
-
     // Ensure bubbles remain within the new screen dimensions
     bubbles.forEach((bubble) => {
       bubble.x = Math.max(0, Math.min(bubble.x, screenWidth - bubble.size));
       bubble.y = Math.max(0, Math.min(bubble.y, screenHeight - bubble.size));
     });
   });
+
+  // Optional: clear interval when a new render happens (container is re-rendered each load)
+  container._splitTimer && clearInterval(container._splitTimer);
+  container._splitTimer = splitTimer;
 }
 
 /* ============ 其他功能 ============ */
@@ -523,7 +1012,7 @@ function blobToDataURL(blob) {
 
 /* ============ 事件绑定 ============ */
 document.addEventListener('DOMContentLoaded', () => {
-  loadFromGAS().catch(console.error);
+  loadFromGAS().catch(() => setStatus('服务不可用（初始化失败）'));
 
   // Initialize slider progress once on load
   const el = ui.pitch?.();
@@ -543,21 +1032,25 @@ document.addEventListener('DOMContentLoaded', () => {
       alert('录音为空或失败，请重试'); return;
     }
 
-    // Hardcoded MP3 as the target format
-    const targetExt = 'mp3';
-    let out = { blob: procBlob, mime: procBlob.type || 'audio/webm', ext: 'webm' };
-    try { out = await transcodeToTarget(procBlob, targetExt); }
-    catch (e) { console.warn('转码失败，将上传原始格式：', e); }
+    // New: no FFmpeg by default. Use the recorder's native type and derive extension.
+    const type = (procBlob.type || 'audio/webm').toLowerCase();
+    const outExt =
+      type.includes('mp4') || type.includes('aac') ? 'm4a' :
+      type.includes('ogg') ? 'ogg' :
+      type.includes('webm') ? 'webm' :
+      'webm';
+    const outMime = type || (outExt === 'm4a' ? 'audio/mp4' : outExt === 'ogg' ? 'audio/ogg' : 'audio/webm');
 
-    const dataURL = await blobToDataURL(out.blob);
+    const dataURL = await blobToDataURL(procBlob);
     await submitToGAS({
       text: ($('bubbleText')?.value || '').trim(),
       audioB64: dataURL,
-      audioMime: out.mime || 'audio/webm',
-      filename: `recording_${Date.now()}.${out.ext}`
+      audioMime: outMime,
+      filename: `recording_${Date.now()}.${outExt}`
     });
     if ($('bubbleText')) $('bubbleText').value = '';
-    await loadFromGAS();
+    const ok = await loadFromGAS();
+    if (!ok) setStatus('已提交，但读取失败（稍后自动重试）');
   });
 
   $('generateBubble')?.addEventListener('click', async () => {
@@ -565,20 +1058,51 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!text) return;
     await submitToGAS({ text });
     if ($('bubbleText')) $('bubbleText').value = '';
-    await loadFromGAS();
+    const ok = await loadFromGAS();
+    if (!ok) setStatus('已提交，但读取失败（稍后自动重试）');
   });
 
+  /* Updated: toggle Test Mic on/off, without touching the Tone.js mic */
   $('testMic')?.addEventListener('click', async () => {
+    const btn = $('testMic');
+    const el = $('micMonitor');
+
+    // If already testing, stop and clean up
+    if (testMicStream) {
+      try { testMicStream.getTracks().forEach(t => t.stop()); } catch {}
+      testMicStream = null;
+      if (el) {
+        el.pause();
+        el.srcObject = null;
+        el.style.display = 'none';
+      }
+      if (btn) btn.textContent = 'Test Mic';
+      return;
+    }
+
+    // Start monitoring
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const el = $('micMonitor');
+      testMicStream = stream;
       if (el) {
         el.srcObject = stream;
         el.style.display = 'block';
-        await el.play().catch(()=>{});
+        await el.play().catch(() => {});
       }
+      if (btn) btn.textContent = 'Stop Test';
     } catch (e) {
       alert('无法访问麦克风，请检查权限');
     }
   });
+});
+
+// Clean up streams on page exit
+window.addEventListener('beforeunload', () => {
+  if (testMicStream) {
+    try { testMicStream.getTracks().forEach(t => t.stop()); } catch {}
+  }
+  if (micOpen && mic?.close) {
+    try { mic.close(); } catch {}
+    micOpen = false;
+  }
 });
