@@ -189,10 +189,10 @@ html, body {
   width: 50px; /* Uniform size */
   height: 50px; /* Uniform size */
   border-radius: 50%; /* Make bubbles circular */
-  background: rgba(255, 255, 255, 0.9);
+  background: #fff; /* Solid white background for correct opacity effect */
   color: transparent; /* Hide text initially */
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  border: 0px solid rgba(0, 0, 0, 0.06);
   user-select: none;
   pointer-events: auto;
   font-size: 14px;
@@ -201,6 +201,21 @@ html, body {
   justify-content: center;
   overflow: hidden;
   transition: transform 0.5s ease, background 0.5s ease, width 0.5s ease, height 0.5s ease;
+}
+
+/* Texture overlay for bubbles */
+.bubble::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: var(--bubble-texture) center/cover no-repeat;
+  opacity: 0.3; /* Adjust texture opacity as needed */
+  transition: background-size 0.5s;
+}
+.bubble--open::after {
+  background-size: cover;
 }
 
 /* Neutral, do not resize on :hover (JS will do precise sizing) */

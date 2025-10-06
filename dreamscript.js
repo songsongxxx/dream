@@ -339,10 +339,20 @@ function renderRows(rows) {
   let screenWidth = window.innerWidth;
   let screenHeight = window.innerHeight;
 
+  const textures = [
+    'dreamimages/texture01.png',
+    'dreamimages/texture02.png',
+    'dreamimages/texture03.png'
+  ];
+
   const createBubble = ({ text, timestamp, audioUrl, audioMime, audioData }, idx) => {
     const wrap = document.createElement('div');
     wrap.className = 'bubble';
     wrap.dataset.timestamp = timestamp || Date.now();
+
+    // Assign a random texture overlay
+    const randomTexture = textures[Math.floor(Math.random() * textures.length)];
+    wrap.style.setProperty('--bubble-texture', `url(${randomTexture})`);
 
     // Random initial position and slower velocity
     const bubbleSize = Math.random() * 50 + 50; // Random size between 50px and 100px
