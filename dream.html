@@ -18,23 +18,14 @@
     <!-- 🌟 导航栏 -->
     <div class="navbar"></div>
 
-    <!-- 📝 控件 -->
-    <div id="controls">
-        <input type="text" id="bubbleText" placeholder="Enter text for bubble">
-        <button id="generateBubble">Generate Bubble</button>
-        <button id="recStart">Start Rec</button>
-        <button id="recStop" disabled>Stop Rec</button>
-        <button id="testMic">Test Mic</button>
-        <audio id="micMonitor" controls></audio>
-    </div>
 
+    <!-- 📝 控件 (centered UI) -->
     <div id="voiceControls" class="voice-controls">
         <div class="vc-row">
             <label class="vc-label">Pitch (semitones):</label>
             <input id="uiPitch" type="range" min="-12" max="12" step="1" value="0" style="flex:1">
             <span id="uiPitchVal">0</span>
         </div>
-
         <div class="vc-row">
             <label class="vc-label">Dream</label>
             <input id="uiRobot" type="checkbox">
@@ -43,6 +34,17 @@
             <label class="vc-label">Ethereal Space</label>
             <input id="uiReverb" type="checkbox">
         </div>
+    </div>
+
+    <div class="ui-center">
+      <div id="controls">
+          <input type="text" id="bubbleText" placeholder="Enter text for bubble">
+          <button id="generateBubble">Generate Bubble</button>
+          <button id="recStart">Start Rec</button>
+          <button id="recStop" disabled>Stop Rec</button>
+          <button id="testMic">Test Mic</button>
+          <audio id="micMonitor" controls></audio>
+      </div>
     </div>
 
     <div id="bubbleContainer"></div>
