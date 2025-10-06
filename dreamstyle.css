@@ -35,12 +35,13 @@ body::before {
   pointer-events: none;
 }
 
+
 body::after {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
-  background: rgba(255, 255, 255, 0.51); /* semi-transparent black overlay for visibility test */
+  background: rgba(255, 255, 255, 0.51); /* semi-transparent overlay */
   pointer-events: none;
 }
 
@@ -184,12 +185,12 @@ html, body {
 }
 
 /* Uniform bubble appearance */
-.bubble {
+ .bubble {
   position: absolute;
   width: 50px; /* Uniform size */
   height: 50px; /* Uniform size */
   border-radius: 50%; /* Make bubbles circular */
-  background: #fff; /* Solid white background for correct opacity effect */
+  background: #fbfbfb; /* Solid white background for correct opacity effect */
   color: transparent; /* Hide text initially */
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
   border: 0px solid rgba(0, 0, 0, 0.06);
@@ -201,6 +202,8 @@ html, body {
   justify-content: center;
   overflow: hidden;
   transition: transform 0.5s ease, background 0.5s ease, width 0.5s ease, height 0.5s ease;
+  -webkit-mask-image: radial-gradient(circle, white 50%, transparent 80%);
+  mask-image: radial-gradient(circle, white 50%, transparent 80%);
 }
 
 /* Texture overlay for bubbles */
@@ -260,6 +263,8 @@ html, body {
   overflow: auto !important;
   max-width: 90vw !important;
   max-height: 90vh !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
 }
 .bubble--open .bubble-content {
   display: block;
