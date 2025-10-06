@@ -30,9 +30,17 @@ body::before {
   content: "";
   position: fixed;
   inset: 0;
+  z-index: -2;
+  background: url('dreamimages/village_by_day.png') center/100% 100% no-repeat;
+  pointer-events: none;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
   z-index: -1;
-  background: url('dreamimages/village_by_day.png') center/contain no-repeat;
-  opacity: 0.2; /* Adjust opacity as needed */
+  background: rgba(255, 255, 255, 0.51); /* semi-transparent black overlay for visibility test */
   pointer-events: none;
 }
 
