@@ -1021,3 +1021,208 @@ html, body {
   .audio-progress::-webkit-slider-thumb { width: 14px; height: 14px; margin-top: -5px; }
   .audio-progress::-moz-range-thumb { width: 14px; height: 14px; }
 }
+
+/* Do not force bubble size on mobile; let JS set it */
+@media (max-width: 768px) {
+  #bubbleContainer .bubble {
+    width: auto !important;   /* was 60px !important */
+    height: auto !important;  /* was 60px !important */
+  }
+}
+
+/* Final downsizing for mobile UI (smaller but full-width) */
+@media (max-width: 768px) {
+  html, body, * {
+    font-size: 13px !important;      /* was 14–16px */
+    letter-spacing: 0.04em !important;
+  }
+
+  .ui-center { gap: 14px !important; }
+
+  /* Controls */
+  #controls { padding: 10px 12px !important; gap: 8px !important; }
+  #controls input[type="text"],
+  #controls button,
+  #bubbleText {
+    height: 30px !important;         /* was 34px */
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+    border-radius: 14px !important;
+  }
+
+  /* Voice controls */
+  .voice-controls { gap: 8px !important; padding: 6px 10px !important; }
+  .vc-row { gap: 6px !important; }
+  .vc-label { font-size: 10.5px !important; }
+
+  /* Audio UI smaller */
+  .audio-ui { font-size: 11.5px !important; gap: 4px !important; }
+  .audio-ui button,
+  .audio-play { width: 26px !important; height: 26px !important; }
+  .audio-time { font-size: 10px !important; }
+
+  /* Sliders smaller thumbs */
+  #uiPitch::-webkit-slider-thumb { width: 12px; height: 12px; margin-top: -4px; }
+  #uiPitch::-moz-range-thumb { width: 12px; height: 12px; }
+  .audio-progress::-webkit-slider-thumb { width: 12px; height: 12px; margin-top: -4px; }
+  .audio-progress::-moz-range-thumb { width: 12px; height: 12px; }
+}
+
+@media (max-width: 420px) {
+  html, body, * {
+    font-size: 12px !important;
+    letter-spacing: 0.02em !important;
+  }
+
+  #controls input[type="text"],
+  #controls button,
+  #bubbleText {
+    height: 28px !important;
+    font-size: 11px !important;
+    padding: 4px 8px !important;
+  }
+
+  .audio-ui { font-size: 11px !important; }
+  .audio-ui button,
+  .audio-play { width: 24px !important; height: 24px !important; }
+}
+
+/* Ultra-compact mobile overrides (final) */
+@media (max-width: 768px) {
+  html, body, * {
+    font-size: 12px !important;       /* smaller base font */
+    letter-spacing: 0.01em !important;
+  }
+
+  /* Controls: tighter padding and smaller inputs/buttons */
+  #controls {
+    padding: 8px 10px !important;
+    gap: 6px !important;
+  }
+  #controls input[type="text"],
+  #controls button,
+  #bubbleText {
+    height: 28px !important;
+    padding: 4px 8px !important;
+    font-size: 11px !important;
+    border-radius: 12px !important;
+  }
+
+  /* Voice controls: compact */
+  .voice-controls {
+    padding: 6px 10px !important;
+    gap: 6px !important;
+  }
+  .vc-row { gap: 6px !important; }
+  .vc-label { font-size: 10px !important; }
+
+  /* Bubble open: tighter padding */
+  .bubble--open {
+    padding: 12px !important;
+    max-width: 92vw !important;
+    max-height: 78vh !important;
+  }
+
+  /* Audio UI smaller */
+  .audio-ui {
+    font-size: 11px !important;
+    gap: 4px !important;
+  }
+  .audio-ui button,
+  .audio-play { width: 24px !important; height: 24px !important; }
+  .audio-time { font-size: 10px !important; }
+  .audio-progress { height: 24px !important; }
+  .audio-progress::-webkit-slider-thumb { width: 12px; height: 12px; margin-top: -4px; }
+  .audio-progress::-moz-range-thumb { width: 12px; height: 12px; }
+  #uiPitch { height: 24px !important; }
+  #uiPitch::-webkit-slider-thumb { width: 12px; height: 12px; margin-top: -4px; }
+  #uiPitch::-moz-range-thumb { width: 12px; height: 12px; }
+}
+
+@media (max-width: 420px) {
+  html, body, * {
+    font-size: 11px !important;       /* smallest base font */
+    letter-spacing: 0.005em !important;
+  }
+
+  #controls input[type="text"],
+  #controls button,
+  #bubbleText {
+    height: 24px !important;
+    padding: 3px 6px !important;
+    font-size: 10px !important;
+    border-radius: 10px !important;
+  }
+
+  .voice-controls {
+    padding: 4px 8px !important;
+    gap: 4px !important;
+  }
+  .vc-label { font-size: 9.5px !important; }
+
+  .bubble--open { padding: 10px !important; max-width: 94vw !important; }
+
+  .audio-ui { font-size: 10.5px !important; gap: 4px !important; }
+  .audio-ui button,
+  .audio-play { width: 22px !important; height: 22px !important; }
+  .audio-time { font-size: 9.5px !important; }
+  .audio-progress { height: 22px !important; }
+  .audio-progress::-webkit-slider-thumb { width: 10px; height: 10px; margin-top: -4px; }
+  .audio-progress::-moz-range-thumb { width: 10px; height: 10px; }
+
+  /* Modal tighter on tiny phones */
+  .modal-dialog {
+    width: min(480px, 94vw) !important;
+    padding: 10px !important;
+  }
+  .modal-actions button {
+    height: 30px !important;
+    padding: 0 10px !important;
+    font-size: 12px !important;
+  }
+}
+
+/* Ensure bubbles are not forced to fixed size on mobile (JS sets size) */
+@media (max-width: 768px) {
+  #bubbleContainer .bubble {
+    width: auto !important;
+    height: auto !important;
+  }
+}
+
+/* Quick overall scaling without layout change */
+.scale-85 {
+  transform: scale(.85);
+  transform-origin: top center;
+}
+@media (max-height: 750px) {
+  .scale-85 { transform: scale(.75); } /* keep >= .75 for tap targets */
+}
+
+/* Compact panel: max width + compact sizing */
+.ui {
+  width: min(420px, 92vw);
+  margin: 0 auto;
+  padding: 12px 14px;
+  border-radius: 14px;
+  gap: 10px; /* works with flex/grid */
+}
+.ui * { font-size: .9rem; }
+.ui label { font-size: .85rem; line-height: 1.2; }
+.ui input[type="checkbox"] {
+  transform: scale(.9);
+  transform-origin: center;
+}
+
+/* Tighten buttons/inputs inside the panel only */
+.ui button,
+.ui input[type="text"] {
+  height: 36px;
+  padding: 6px 10px;
+  border-radius: 10px;
+}
+.ui input[type="text"] {
+  height: 34px;
+  padding: 6px 10px;
+}
+.ui input[type="range"] { height: 18px; }
