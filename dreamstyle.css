@@ -231,6 +231,9 @@ html, body {
   mask-image: radial-gradient(circle, white 50%, transparent 80%);
 }
 
+/* Default: bubbles under UI */
+#bubbleContainer .bubble { z-index: 1; }
+
 /* Shards used for split/regroup FX */
 .bubble-shard {
   position: absolute;
@@ -301,7 +304,7 @@ html, body {
   padding: 16px !important;
   background: rgba(255,255,255,1) !important;
   color: #1b1b1b !important;
-  z-index: 1000 !important;
+  z-index: 5000 !important; /* was 1000 */
   display: block !important;
   overflow: auto !important;
   max-width: 90vw !important;
@@ -565,104 +568,110 @@ html, body {
 }
 
 /* 小屏优化 */
-@media (max-width: 420px) {
-  #controls {
-    top: 28%;
-    width: 92%;
-    gap: 6px;
-    padding: 10px 12px;
-  }
-  #controls input[type="text"], #controls button {
-    height: 36px;
-    font-size: 14px;
-    padding: 6px 10px;
-  }
-  .vc-label { width: 84px; }
-  .bubble { font-size: 12px; max-width: 46ch; }
-}
-
-/* Small screen optimizations */
 @media (max-width: 768px) {
-  /* Adjust controls for smaller screens */
-  #controls {
-    top: 30%;
-    width: 90%;
-    flex-direction: column;
-    gap: 8px;
-    padding: 12px 16px;
-  }
-  #controls input[type="text"], #controls button {
-    width: 100%;
-    height: 36px;
-    font-size: 14px;
-    padding: 6px 10px;
+  /* Layout base */
+  html, body, * { letter-spacing: 0.02em !important; }
+  body { overflow-x: hidden; font-size: 15px; }
+
+  /* Let the center wrapper flow full width on mobile */
+  .ui-center {
+    position: static !important;
+    transform: none !important;
+    width: 100% !important;
+    padding: 8px 12px !important;
   }
 
-  /* Adjust voice controls */
+  /* Controls use full width, stacked */
+  #controls {
+    width: calc(100% - 16px) !important;
+    max-width: none !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+  #controls input[type="text"],
+  #controls button {
+    width: 100% !important;
+  }
+  #bubbleText,
+  input[type="text"],
+  textarea {
+    width: 100% !important;
+    font-size: 14px !important;
+    padding: 10px 14px !important;
+    border-radius: 12px !important;
+  }
+  button, .button {
+    font-size: 14px !important;
+    padding: 8px 14px !important;
+    border-radius: 10px !important;
+  }
+
+  /* Voice controls: full width and wrapping labels */
   .voice-controls {
-    margin: 0;
-    padding-top: 0;
-    gap: 12px;
+    width: calc(100% - 12px) !important;
+    padding: 8px !important;
   }
   .vc-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
+    width: 100% !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
   }
   .vc-label {
-    width: auto;
-    text-align: left;
-    font-size: 14px;
+    width: auto !important;
+    min-width: 0 !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    text-align: left !important;
+    font-size: 12px !important;
   }
+  #uiPitch { width: 100% !important; }
 
-  /* Adjust bubble container */
+  /* Bubbles: remain under UI; opened bubbles are handled by .bubble--open z-index */
   #bubbleContainer {
-    margin-top: 100px; /* Leave space for controls */
-    padding: 6px;
+    /* keep fixed as desktop to avoid jumpiness */
+    overflow: hidden !important;
+    height: 100vh !important;
   }
-  .bubble {
-    font-size: 12px;
-    max-width: 90%;
-    padding: 8px 10px;
+  #bubbleContainer .bubble {
+    width: 60px !important;
+    height: 60px !important;
+    z-index: 1 !important;
+    transition: all 0.25s ease-out;
+  }
+  .bubble--open {
+    max-width: 95vw !important;
+    max-height: 80vh !important;
+    z-index: 5000 !important;
+    overflow: auto !important;
   }
 
-  /* Adjust mic monitor */
-  #micMonitor {
-    width: 100%;
-    margin: 12px auto 0;
+  /* Audio UI: stack neatly and fill width */
+  .audio-ui {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    font-size: 13px !important;
+    gap: 6px !important;
   }
+  .audio-ui button {
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 14px !important;
+  }
+  .audio-progress { width: 100% !important; }
+
+  /* Loader text sizing */
+  #globalLoading { font-size: 16px !important; }
 }
 
+/* Tiny phones */
 @media (max-width: 420px) {
-  /* Further adjustments for very small screens */
-  #controls {
-    top: 35%;
-    gap: 6px;
-    padding: 10px 12px;
-  }
-  #controls input[type="text"], #controls button {
-    height: 32px;
-    font-size: 12px;
-    padding: 4px 8px;
-  }
-  .vc-label {
-    font-size: 12px;
-  }
-  .bubble {
-    font-size: 10px;
-    max-width: 80%;
-  }
-  .vc-label {
-    font-size: 10px;
-  }
-
-  .vc-row {
-    gap: 4px;
-  }
-
-  #uiPitch {
-    width: 100%;
-  }
+  html, body, * { letter-spacing: 0.01em !important; }
+  #controls { width: calc(100% - 12px) !important; }
 }
 
 /* Modern thin range slider for #uiPitch */
@@ -764,4 +773,251 @@ html, body {
   font-size: 12px;
   color: #b00020; /* error-ish */
   display: none;
+}
+
+/* Split animation */
+.bubble--split {
+  animation: bubbleSplit 0.8s ease-out;
+}
+@keyframes bubbleSplit {
+  0%   { transform: scale(1);   opacity: 1; }
+  50%  { transform: scale(1.12); opacity: 0.9; }
+  100% { transform: scale(1);   opacity: 1; }
+}
+
+/* Default bubbles under UI (opened state overridden below) */
+#bubbleContainer .bubble { z-index: 1; }
+
+/* Ensure opened bubble above all UI */
+.bubble--open {
+  z-index: 5000 !important;
+}
+
+/* Mobile readability and control width */
+@media (max-width: 768px) {
+  html, body, * {
+    letter-spacing: 0.02em !important; /* smaller tracking to avoid truncation */
+  }
+  .voice-controls {
+    width: calc(100% - 12px) !important;
+    padding: 8px !important;
+  }
+  .vc-row {
+    width: 100% !important;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .vc-label {
+    white-space: normal;
+    overflow-wrap: anywhere;  /* allow label wrap */
+  }
+  #controls {
+    width: calc(100% - 24px) !important; /* expand to fit content */
+  }
+}
+
+@media (max-width: 420px) {
+  html, body, * {
+    letter-spacing: 0.01em !important;
+  }
+  .voice-controls { padding: 6px !important; }
+  #controls { width: calc(100% - 16px) !important; }
+}
+
+/* Share/Delete modal (for dynamically created modal) */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 6000;              /* above opened bubbles */
+  background: rgba(0,0,0,0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  backdrop-filter: blur(4px);
+}
+.modal.open { display: flex; }
+.modal-dialog {
+  width: min(560px, 92vw);
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06);
+  padding: 16px;
+  text-align: left;
+}
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+.modal-actions button {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.12);
+  background: #f7f7f7;
+  cursor: pointer;
+}
+
+/* Make the Generate Bubble UI wider, input spans full width on mobile */
+#bubbleText {
+  width: min(720px, 100%);
+  max-width: 100%;
+}
+@media (max-width: 768px) {
+  #controls {
+    width: calc(100% - 12px) !important;  /* occupy full width on mobile */
+    max-width: none !important;
+  }
+  #bubbleText {
+    width: 100% !important;
+  }
+}
+
+/* 在 CSS 文件 dreamstyle.css 中添加 */
+#bubbleContainer .bubble {
+  position: absolute;
+  z-index: 1; /* 所有泡泡默认在 UI 下层 */
+}
+
+/* Final mobile overrides to force full-width UI */
+@media (max-width: 768px) {
+  :root { --page-pad: 12px; }
+
+  /* Let the center wrapper flow and fill width */
+  .ui-center {
+    position: static !important;
+    transform: none !important;
+    width: 100dvw !important;
+    max-width: 100dvw !important;
+    padding: 0 var(--page-pad) !important;
+  }
+
+  /* Controls: full width, stacked, no fixed positioning */
+  #controls {
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    transform: none !important;
+    width: 100dvw !important;
+    max-width: 100dvw !important;
+    padding: 12px var(--page-pad) !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+    box-sizing: border-box !important;
+  }
+  #controls input[type="text"],
+  #controls button,
+  #bubbleText,
+  textarea {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    font-size: 16px !important; /* readable on mobile */
+  }
+
+  /* Voice controls: full width bar */
+  .voice-controls {
+    position: sticky !important;
+    top: 0 !important;
+    left: 0 !important;
+    transform: none !important;
+    width: 100dvw !important;
+    max-width: 100dvw !important;
+    padding: 8px var(--page-pad) !important;
+    border-radius: 0 !important;
+    max-width: none !important;
+    box-sizing: border-box !important;
+  }
+  .vc-row {
+    width: 100% !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+  .vc-label {
+    width: auto !important;
+    min-width: 0 !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    text-align: left !important;
+    font-size: 13px !important;
+  }
+  #uiPitch { width: 100% !important; }
+
+  /* Bubbles remain under UI; opened bubbles already lift above */
+  #bubbleContainer {
+    overflow: hidden !important;
+    height: 100dvh !important;
+  }
+  #bubbleContainer .bubble {
+    width: 60px !important;
+    height: 60px !important;
+    z-index: 1 !important;
+    transition: all 0.25s ease-out;
+  }
+
+  /* Audio UI: fill width neatly */
+  .audio-ui {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    gap: 6px !important;
+    font-size: 14px !important;
+  }
+  .audio-progress { width: 100% !important; }
+}
+
+@media (max-width: 420px) {
+  /* Tighten padding a bit on very small phones */
+  :root { --page-pad: 10px; }
+}
+
+/* Make mobile UI a bit smaller while keeping full width */
+@media (max-width: 768px) {
+  body { font-size: 14px !important; }
+  .ui-center { gap: 16px !important; }
+
+  #controls input[type="text"],
+  #controls button {
+    height: 34px !important;
+    padding: 6px 10px !important;
+    font-size: 13px !important;
+    border-radius: 16px !important;
+  }
+
+  .voice-controls { gap: 10px !important; }
+  .vc-label { font-size: 11px !important; }
+
+  /* Audio UI smaller */
+  .audio-ui { font-size: 12px !important; gap: 6px !important; }
+  .audio-ui button,
+  .audio-play { width: 32px !important; height: 32px !important; }
+
+  .audio-time { font-size: 11px !important; }
+
+  /* Smaller thumbs on sliders */
+  #uiPitch::-webkit-slider-thumb { width: 14px; height: 14px; margin-top: -5px; }
+  #uiPitch::-moz-range-thumb { width: 14px; height: 14px; }
+}
+
+@media (max-width: 420px) {
+  body { font-size: 13px !important; }
+
+  #controls input[type="text"],
+  #controls button {
+    height: 32px !important;
+    font-size: 12px !important;
+    padding: 5px 10px !important;
+  }
+
+  .audio-ui { font-size: 11.5px !important; }
+  .audio-ui button,
+  .audio-play { width: 28px !important; height: 28px !important; }
+
+  /* Smaller progress thumb for tight screens */
+  .audio-progress::-webkit-slider-thumb { width: 14px; height: 14px; margin-top: -5px; }
+  .audio-progress::-moz-range-thumb { width: 14px; height: 14px; }
 }

@@ -2,11 +2,255 @@
 const $ = (id) => document.getElementById(id);
 const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwN2_h8gvABFBO4R13BaUMtigofFVRt-CCNy4Fqgl5WjCZZFDZs3xI53eelPe-Sk3eI/exec";
 
-/* Client-side lifetime and split FX configs */
-const BUBBLE_TTL_MS = 30 * 24 * 60 * 60 * 1000;   // 30 days
-const SPLIT_INTERVAL_MS = 25000;                   // every 25s try splitting a bubble
-const SPLIT_DURATION_MS = 3500;                    // one split cycle duration
-const SHARD_COUNT_MIN = 5, SHARD_COUNT_MAX = 9;    // number of shards per split
+// 简易状态显示
+function setStatus(msg, kind = 'info') {
+  const el = $('statusMsg');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.style.display = msg ? 'block' : 'none';
+  el.style.color = kind === 'error' ? '#b00020' : '#334155';
+}
+
+// Global loading overlay toggle
+function setGlobalLoading(on) {
+  const el = $('globalLoading');
+  if (!el) return;
+  if (on) el.classList.remove('is-hidden');
+  else el.classList.add('is-hidden');
+}
+
+// Build a custom grayscale audio UI around a given <audio> element
+function buildCustomAudioUI(audio, { label = '', live = false } = {}) {
+  audio.controls = false;
+
+  const ui = document.createElement('div');
+  ui.className = 'audio-ui';
+  // Play/Pause
+  const btnPlay = document.createElement('button');
+  btnPlay.className = 'audio-play';
+  btnPlay.type = 'button';
+  btnPlay.title = 'Play/Pause';
+  btnPlay.textContent = '▶';
+  // Stop
+  const btnStop = document.createElement('button');
+  btnStop.className = 'audio-stop';
+  btnStop.type = 'button';
+  btnStop.title = 'Stop';
+  btnStop.textContent = '■';
+  // Progress
+  const progress = document.createElement('input');
+  progress.className = 'audio-progress';
+  progress.type = 'range';
+  progress.min = '0';
+  progress.max = '1000';
+  progress.value = '0';
+  // Time label
+  const time = document.createElement('div');
+  time.className = 'audio-time';
+  time.textContent = '00:00 / 00:00';
+  // Volume
+  const volWrap = document.createElement('div');
+  volWrap.className = 'audio-vol';
+  const volSlider = document.createElement('input');
+  volSlider.className = 'audio-volume';
+  volSlider.type = 'range';
+  volSlider.min = '0';
+  volSlider.max = '1';
+  volSlider.step = '0.01';
+  volSlider.value = String(audio.volume ?? 1);
+
+  // For live streams, hide seek/time UI
+  if (!live) {
+    ui.appendChild(btnPlay);
+    ui.appendChild(btnStop);
+    ui.appendChild(progress);
+    ui.appendChild(time);
+  } else {
+    ui.appendChild(btnPlay);
+    ui.appendChild(btnStop);
+  }
+  volWrap.appendChild(volSlider);
+  ui.appendChild(volWrap);
+
+  const fmt = (sec) => {
+    if (!isFinite(sec)) return '00:00';
+    const m = Math.floor(sec / 60).toString().padStart(2, '0');
+    const s = Math.floor(sec % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
+
+  function syncTime() {
+    if (live) {
+      // If using WebAudio fallback, treat gain>0 as "playing"
+      const isPlaying = audio._ctxNodes
+        ? ((audio._ctxNodes.gain?.gain?.value ?? 0) > 0)
+        : !audio.paused;
+      btnPlay.textContent = isPlaying ? '❚❚' : '▶';
+      btnPlay.classList.toggle('is-playing', isPlaying);
+      return;
+    }
+    const d = audio.duration || 0;
+    const c = audio.currentTime || 0;
+    const pct = d > 0 ? Math.max(0, Math.min(1, c / d)) : 0;
+    progress.value = String(Math.floor(pct * 1000));
+    time.textContent = `${fmt(c)} / ${fmt(d)}`;
+    btnPlay.textContent = audio.paused ? '▶' : '❚❚';
+    btnPlay.classList.toggle('is-playing', !audio.paused);
+  }
+  function seekBySlider() {
+    if (live) return;
+    const d = audio.duration || 0;
+    if (d > 0) {
+      const pct = parseInt(progress.value, 10) / 1000;
+      audio.currentTime = Math.max(0, Math.min(d * pct, d - 0.001));
+    }
+  }
+
+  btnPlay.addEventListener('click', () => {
+    // Live fallback: toggle WebAudio gain instead of <audio> playback
+    if (live && audio._ctxNodes) {
+      const g = audio._ctxNodes.gain;
+      if (g) g.gain.value = g.gain.value > 0 ? 0 : 1;
+      syncTime();
+      return;
+    }
+    if (audio.paused) audio.play().catch(()=>{});
+    else audio.pause();
+  });
+  btnStop.addEventListener('click', () => {
+    try { audio.pause(); } catch(_) {}
+    if (live && audio.srcObject) {
+      try { audio.srcObject.getTracks().forEach(t => t.stop()); } catch(_) {}
+      try { audio.srcObject = null; } catch(_) {}
+    }
+    // Cleanup WebAudio fallback nodes if any
+    if (live && audio._ctxNodes) {
+      try { audio._ctxNodes.src?.disconnect?.(); } catch(_) {}
+      try { audio._ctxNodes.gain?.disconnect?.(); } catch(_) {}
+      audio._ctxNodes = null;
+    }
+    try { audio.currentTime = 0; } catch(_) {}
+    syncTime();
+  });
+  if (!live) progress.addEventListener('input', seekBySlider);
+  volSlider.addEventListener('input', () => {
+    audio.volume = parseFloat(volSlider.value || '1');
+  });
+
+  audio.addEventListener('timeupdate', syncTime);
+  audio.addEventListener('loadedmetadata', syncTime);
+  audio.addEventListener('play', syncTime);
+  audio.addEventListener('pause', syncTime);
+  syncTime();
+
+  ui._dispose = () => {
+    audio.removeEventListener('timeupdate', syncTime);
+    audio.removeEventListener('loadedmetadata', syncTime);
+    audio.removeEventListener('play', syncTime);
+    audio.removeEventListener('pause', syncTime);
+  };
+
+  return ui;
+}
+
+// Show audio share confirm modal, return 'share' | 'delete' | 'cancel'
+function showAudioShareConfirm({ url, simpleOnly = false }) {
+  // Fallback simple confirm
+  if (simpleOnly) {
+    const ok = confirm('Share this recording?\n\nOK = Share, Cancel = Delete');
+    try { URL.revokeObjectURL(url); } catch (_) {}
+    return Promise.resolve(ok ? 'share' : 'delete');
+  }
+
+  // Build a fresh modal only when needed (nothing sits in DOM by default)
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.setAttribute('aria-hidden', 'true');
+  modal.setAttribute('role', 'dialog');
+
+  const dialog = document.createElement('div');
+  dialog.className = 'modal-dialog';
+
+  const title = document.createElement('h3');
+  title.textContent = 'Share this dream?';
+
+  const audio = document.createElement('audio');
+  audio.controls = false;
+
+  const actions = document.createElement('div');
+  actions.className = 'modal-actions';
+  const btnShare = document.createElement('button');
+  btnShare.id = 'btnShare';
+  btnShare.textContent = 'Share';
+  const btnDelete = document.createElement('button');
+  btnDelete.id = 'btnDelete';
+  btnDelete.textContent = 'Delete';
+  actions.append(btnShare, btnDelete);
+
+  dialog.append(title, audio, actions);
+  modal.appendChild(dialog);
+  document.body.appendChild(modal);
+
+  // Prepare audio + custom UI
+  audio.src = url;
+  const custom = buildCustomAudioUI(audio);
+  audio.after(custom);
+
+  // open
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+
+  // Allow clicking backdrop to cancel
+  const onBackdrop = (e) => { if (e.target === modal) cleanup('cancel'); };
+
+  return new Promise((resolve) => {
+    const cleanup = (result) => {
+      btnShare.removeEventListener('click', onShare);
+      btnDelete.removeEventListener('click', onDelete);
+      modal.removeEventListener('click', onBackdrop);
+      try { custom._dispose?.(); } catch(_) {}
+      try { audio.pause(); } catch(_) {}
+      try { URL.revokeObjectURL(url); } catch(_) {}
+      try { modal.remove(); } catch(_) {}
+      resolve(result);
+    };
+    const onShare = () => cleanup('share');
+    const onDelete = () => cleanup('delete');
+
+    btnShare.addEventListener('click', onShare, { once: true });
+    btnDelete.addEventListener('click', onDelete, { once: true });
+    modal.addEventListener('click', onBackdrop);
+  });
+}
+
+/* ============ Audio unlock on user gesture ============ */
+let audioUnlocked = false;
+function installAudioUnlockOnce() {
+  if (audioUnlocked) return;
+
+  const unlock = async () => {
+    try {
+      // Start Tone's AudioContext on a user gesture
+      if (window.Tone) {
+        try { await Tone.start(); } catch (_) {}
+        try { await Tone.context?.resume?.(); } catch (_) {}
+      }
+      audioUnlocked = (Tone?.context?.state === 'running');
+      console.log('Audio unlocked:', audioUnlocked);
+    } catch (e) {
+      console.warn('Audio unlock failed', e);
+    } finally {
+      // Remove listeners to avoid repeated calls
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+      window.removeEventListener('touchstart', unlock, { passive: true });
+    }
+  };
+
+  window.addEventListener('pointerdown', unlock, { once: true });
+  window.addEventListener('keydown', unlock, { once: true });
+  window.addEventListener('touchstart', unlock, { once: true, passive: true });
+}
 
 /* UI 取值 */
 const ui = {
@@ -46,42 +290,14 @@ let mediaStreamDest;     // WebAudio MediaStreamDestination
 let rec;                 // MediaRecorder
 let recChunks = [];
 
-/* New: separate stream for the Test Mic monitor (independent of Tone.js chain) */
-let testMicStream = null;
-
-/* New: track Tone mic open state and shared constraints */
-let micOpen = false;
-const defaultMicConstraints = { audio: true };
-
-/* New helpers: reopen/close Tone mic */
-async function ensureMicOpen() {
-  if (micOpen) return;
-  if (!mic) return;
-  try {
-    await mic.open(defaultMicConstraints);
-    micOpen = true;
-    console.log('🎤 Mic opened');
-  } catch (e) {
-    console.warn('Failed to open mic', e);
-  }
-}
-async function closeToneMic() {
-  if (!micOpen || !mic?.close) return;
-  try {
-    await mic.close();
-  } catch (_) {}
-  micOpen = false;
-  console.log('🔇 Mic closed');
-}
-
 async function ensureToneChain() {
   if (toneReady) return;
   await Tone.start();
 
   mic = new Tone.UserMedia();
-  await mic.open(defaultMicConstraints);
-  micOpen = true;
-  console.log('🎤 Default mic opened with', defaultMicConstraints);
+  const constraints = { audio: true }; // Always use the default microphone
+  await mic.open(constraints);
+  console.log('🎤 Default mic opened with', constraints);
 
   // Effects
   pitchShift = new Tone.PitchShift({ pitch: 0, windowSize: 0.1, delayTime: 0.01, feedback: 0 });
@@ -138,14 +354,17 @@ function getRecorderForProcessedStream() {
 
 async function unlockAudioContext() {
   if (window.Tone && Tone.context && Tone.context.state !== 'running') {
-    try { await Tone.start(); } catch(e) { console.warn('AudioContext 解锁失败', e); }
+    try { await Tone.start(); } catch(e) { console.warn('Failed to unlock AudioContext', e); }
   }
 }
 
 async function startRec() {
   await unlockAudioContext();
   await ensureToneChain();
-  await ensureMicOpen(); // New: reopen mic if it was closed
+  // 确保麦克风在再次录音前已打开
+  if (mic && mic.state !== 'started') {
+    try { await mic.open({ audio: true }); } catch (e) { console.warn('mic reopen failed', e); }
+  }
   recChunks = [];
   rec = getRecorderForProcessedStream();
   rec.start();
@@ -168,11 +387,11 @@ async function stopRec() {
   $('recStart').disabled = false;
   $('recStop').disabled  = true;
 
-  // New: also stop/close the Tone.js microphone
-  await closeToneMic();
+  // Close mic (release hardware)
+  try { await mic?.close?.(); } catch (e) { console.warn('Failed to close microphone', e); }
 
   if (blob.size === 0) {
-    console.error('❌ 录音数据为空或损坏');
+    console.error('Recording data is empty or corrupted');
     return null;
   }
   return blob;
@@ -180,55 +399,43 @@ async function stopRec() {
 
 /* ============ ffmpeg.wasm 转码（仅一份） ============ */
 let ffmpegInstance;
-/* New: remember the core path that matches the loaded ffmpeg.min.js */
-let ffmpegCorePath = null;
-
+let FF_CORE_PATH = null; // 仅本地脚本时设置 corePath
 async function ensureFfmpegScript() {
-  // If already present, return a usable corePath (fallback to CDN)
-  if (window.FFmpeg?.createFFmpeg) {
-    return ffmpegCorePath || 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/ffmpeg-core.js';
-  }
-  const candidates = [
-    './lib/ffmpeg/ffmpeg.min.js', // Local (if you host files here)
+  if (window.FFmpeg?.createFFmpeg) return true;
+  // 先用 CDN，最后再尝试本地，避免 404/MIME 警告
+  const sources = [
     'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/ffmpeg.min.js',
     'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/ffmpeg.min.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.12.10/ffmpeg.min.js'
+    'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.12.10/ffmpeg.min.js',
+    './lib/ffmpeg/ffmpeg.min.js' // 本地兜底
   ];
-  for (const minSrc of candidates) {
+  for (const src of sources) {
     try {
       await new Promise((res, rej) => {
         const s = document.createElement('script');
-        s.src = minSrc;
-        s.crossOrigin = 'anonymous';
-        s.referrerPolicy = 'no-referrer';
+        s.src = src;
         s.onload = res;
         s.onerror = rej;
         document.head.appendChild(s);
       });
       if (window.FFmpeg?.createFFmpeg) {
-        // Derive ffmpeg-core.js from the successful min.js URL
-        const absMin = new URL(minSrc, location.href);
-        const coreAbs = new URL('ffmpeg-core.js', absMin);
-        ffmpegCorePath = coreAbs.href;
-        return ffmpegCorePath;
+        // 仅当使用本地脚本时，指定本地 corePath；CDN 则让其自动加载对应 core
+        FF_CORE_PATH = src.startsWith('.') ? new URL('./lib/ffmpeg/ffmpeg-core.js', location.href).href : null;
+        return true;
       }
-    } catch (_) {
-      // try next candidate
-    }
+    } catch (_) {}
   }
-  return '';
+  return false;
 }
 
 async function ensureFFmpeg() {
-  const corePath = await ensureFfmpegScript();
-  if (!corePath) throw new Error('FFmpeg script 加载失败');
+  const ok = await ensureFfmpegScript();
+  if (!ok) throw new Error('Failed to load FFmpeg script');
   if (ffmpegInstance) return ffmpegInstance;
   const { createFFmpeg } = window.FFmpeg;
-  const ff = createFFmpeg({
-    log: false,
-    /* Updated: use derived corePath instead of always local */
-    corePath
-  });
+  const opts = { log: false };
+  if (FF_CORE_PATH) opts.corePath = FF_CORE_PATH;
+  const ff = createFFmpeg(opts);
   await ff.load();
   ffmpegInstance = ff;
   return ff;
@@ -279,13 +486,13 @@ async function transcodeToTarget(inputBlob, targetExt) {
     }
     return await run('webm', ['-i', inName, '-vn', '-c:a', 'libopus', '-b:a', '96k']);
   } catch (e) {
-    console.warn('目标格式转码失败，回退 MP3：', e);
+    console.warn('Target format transcode failed, falling back to MP3:', e);
     return await run('mp3', ['-i', inName, '-vn', '-c:a', 'libmp3lame', '-b:a', '160k']);
   }
 }
 
 /* ============ 与 GAS 交互（表单 POST & JSONP 读） ============ */
-const LIMIT = 5; // 内联条数，避免过大脚本
+const LIMIT = 1000; // 内联条数，加载更多文本（原为 5）
 function postViaHiddenForm(url, fields) {
   return new Promise((resolve) => {
     const iframeName = 'gas_iframe_' + Date.now();
@@ -318,13 +525,6 @@ function postViaHiddenForm(url, fields) {
     form.submit();
   });
 }
-/* New: lightweight status helper */
-function setStatus(msg) {
-  const el = $('statusMsg');
-  if (!el) return;
-  el.textContent = msg || '';
-  el.style.display = msg ? 'block' : 'none';
-}
 async function submitToGAS({ text = '', audioB64 = '', audioMime = '', filename = '' }) {
   const timestamp = Date.now(); // Add a timestamp for the bubble
   await postViaHiddenForm(WEB_APP_URL, {
@@ -332,56 +532,60 @@ async function submitToGAS({ text = '', audioB64 = '', audioMime = '', filename 
     audio_b64: audioB64,
     audio_mime: audioMime,
     filename,
-    timestamp // Include the timestamp in the submission
+    timestamp,                    // Include the timestamp in the submission
+    origin: location.origin || '' // Help backend validate/debug
   });
 }
-/* Updated: robust JSONP with unique callback + timeout + cleanup */
 function loadFromGAS() {
-  return new Promise((resolve) => {
-    const cb = 'receiveRows_' + Date.now();
-    let finished = false;
-
-    function cleanup(scriptEl) {
-      try { delete window[cb]; } catch {}
-      if (scriptEl?.parentNode) scriptEl.parentNode.removeChild(scriptEl);
-    }
-
-    window[cb] = (data) => {
-      if (finished) return;
-      finished = true;
+  const MAX_TRIES = 3;
+  return new Promise(async (resolve, reject) => {
+    for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
       try {
-        if (!data || !data.ok) throw new Error((data && data.error) || 'unknown');
-        renderRows(Array.isArray(data.rows) ? data.rows : []);
-        setStatus('');
-        resolve(true);
+        await new Promise((res, rej) => {
+          const s = document.createElement('script');
+          let finished = false;
+          const cleanup = () => {
+            if (finished) return;
+            finished = true;
+            try { if (s && s.parentNode) s.parentNode.removeChild(s); } catch {}
+            clearTimeout(timer);
+          };
+          const handler = (data) => {
+            try {
+              if (!data || !data.ok) throw new Error((data && data.error) || 'unknown');
+              renderRows(Array.isArray(data.rows) ? data.rows : []);
+              setStatus('', 'info');
+              res(true);
+            } catch (e) {
+              rej(e);
+            } finally {
+              cleanup();
+            }
+          };
+          // 固定回调名，先注册全局，避免 “not defined”
+          window.receiveRows = handler;
+          try { (globalThis || window).receiveRows = handler; } catch (_) {}
+
+          const timer = setTimeout(() => {
+            cleanup();
+            rej(new Error('timeout'));
+          }, 12000);
+
+          s.src = `${WEB_APP_URL}?callback=receiveRows&limit=${LIMIT}&inline=1&_=${Date.now()}`;
+          s.onerror = () => { cleanup(); rej(new Error('jsonp_onerror')); };
+          document.body.appendChild(s);
+        });
+        return resolve(true);
       } catch (e) {
-        console.error('❌ 数据解析失败：', e);
-        setStatus('服务不可用（GAS 错误）');
-        resolve(false);
-      } finally {
-        cleanup(scriptEl);
+        if (attempt === MAX_TRIES) {
+          console.error('GAS load failed:', e);
+          setStatus('Service unavailable (timeout/403). Please try again later.', 'error');
+          return reject(e);
+        }
+        setStatus(`Retrying to load… (attempt ${attempt + 1})`, 'info');
+        await new Promise(r => setTimeout(r, 800 * attempt));
       }
-    };
-
-    const scriptEl = document.createElement('script');
-    scriptEl.src = `${WEB_APP_URL}?callback=${cb}&limit=${LIMIT}&inline=1&_=${Date.now()}`;
-    scriptEl.onerror = () => {
-      if (finished) return;
-      finished = true;
-      setStatus('服务不可用（网络/CORS/403）');
-      cleanup(scriptEl);
-      resolve(false);
-    };
-    document.body.appendChild(scriptEl);
-
-    // Timeout guard
-    setTimeout(() => {
-      if (finished) return;
-      finished = true;
-      setStatus('服务不可用（超时/403）');
-      cleanup(scriptEl);
-      resolve(false);
-    }, 8000);
+    }
   });
 }
 
@@ -426,321 +630,48 @@ function guessMimeFromUrl(u) {
 let currentAudio = null;
 let currentBtn = null;
 
-/* Helpers: audio UI builder and content utils */
-function buildCustomAudioControls(audio, contentEl) {
-  // Remove any existing custom UI
-  contentEl.querySelectorAll('.audio-ui').forEach(n => n.remove());
-
-  const aui = document.createElement('div');
-  aui.className = 'audio-ui';
-
-  const playBtn = document.createElement('button');
-  playBtn.className = 'audio-play';
-  playBtn.type = 'button';
-  playBtn.textContent = '▶';
-
-  const progress = document.createElement('input');
-  progress.className = 'audio-progress';
-  progress.type = 'range';
-  progress.min = '0';
-  progress.max = '1';
-  progress.step = '0.01';
-  progress.value = '0';
-  progress.disabled = true;
-
-  const volWrap = document.createElement('div');
-  volWrap.className = 'audio-vol';
-  const volBtn = document.createElement('button');
-  volBtn.className = 'audio-vol-btn';
-  volBtn.type = 'button';
-  volBtn.textContent = '🔊';
-  const vol = document.createElement('input');
-  vol.className = 'audio-volume';
-  vol.type = 'range';
-  vol.min = '0';
-  vol.max = '1';
-  vol.step = '0.01';
-  vol.value = '1';
-  volWrap.appendChild(volBtn);
-  volWrap.appendChild(vol);
-
-  const timeEl = document.createElement('span');
-  timeEl.className = 'audio-time';
-  timeEl.textContent = '00:00 / 00:00';
-
-  aui.appendChild(playBtn);
-  aui.appendChild(progress);
-  aui.appendChild(volWrap);
-  aui.appendChild(timeEl);
-  contentEl.appendChild(aui);
-
-  audio.addEventListener('loadedmetadata', () => {
-    const dur = isFinite(audio.duration) ? audio.duration : 0;
-    progress.max = String(dur || 1);
-    progress.step = '0.01';
-    progress.disabled = !dur;
-    timeEl.textContent = `${formatDuration(0)} / ${formatDuration(dur)}`;
-  });
-
-  audio.addEventListener('timeupdate', () => {
-    if (!progress.disabled) progress.value = String(audio.currentTime || 0);
-    const dur = isFinite(audio.duration) ? audio.duration : 0;
-    timeEl.textContent = `${formatDuration(audio.currentTime || 0)} / ${formatDuration(dur)}`;
-  });
-
-  audio.addEventListener('ended', () => {
-    playBtn.textContent = '▶';
-    playBtn.classList.remove('is-playing');
-    progress.value = '0';
-  });
-
-  function syncVolIcon() {
-    if (audio.muted || +vol.value === 0) {
-      volBtn.textContent = '🔇';
-    } else if (+vol.value < 0.5) {
-      volBtn.textContent = '🔈';
-    } else {
-      volBtn.textContent = '🔊';
-    }
-  }
-  audio.volume = 1;
-  audio.muted = false;
-  syncVolIcon();
-
-  vol.addEventListener('input', () => {
-    const v = parseFloat(vol.value || '0') || 0;
-    audio.volume = v;
-    if (v > 0 && audio.muted) audio.muted = false;
-    syncVolIcon();
-  });
-  volBtn.addEventListener('click', () => {
-    audio.muted = !audio.muted;
-    if (audio.muted) {
-      vol.dataset.prev = vol.value;
-      vol.value = '0';
-    } else {
-      const prev = vol.dataset.prev;
-      if (prev) {
-        vol.value = prev;
-        audio.volume = parseFloat(prev || '0') || 0.5;
-      } else if (+vol.value === 0) {
-        vol.value = '0.5';
-        audio.volume = 0.5;
-      }
-    }
-    syncVolIcon();
-  });
-  audio.addEventListener('volumechange', syncVolIcon);
-
-  playBtn.addEventListener('click', async () => {
-    if (audio.paused) {
-      if (currentAudio && currentAudio !== audio) {
-        try { currentAudio.pause(); } catch {}
-        if (currentBtn) {
-          currentBtn.textContent = '▶';
-          currentBtn.classList.remove('is-playing');
-        }
-      }
-      currentAudio = audio;
-      currentBtn = playBtn;
-      try { await audio.play(); } catch {}
-      playBtn.textContent = '⏸';
-      playBtn.classList.add('is-playing');
-    } else {
-      audio.pause();
-      playBtn.textContent = '▶';
-      playBtn.classList.remove('is-playing');
-    }
-  });
-
-  progress.addEventListener('input', () => {
-    if (!progress.disabled) {
-      audio.currentTime = parseFloat(progress.value || '0') || 0;
-    }
-  });
-
-  return aui;
-}
-function getBubbleText(rec) {
-  const el = rec.element.querySelector('.bubble-text');
-  return el ? (el.textContent || '') : '';
-}
-function getBubbleAudio(rec) {
-  const src = rec.element.querySelector('audio source');
-  if (!src) return null;
-  return { src: src.getAttribute('src') || '', type: src.getAttribute('type') || '' };
-}
-function updateBubbleTypeClass(wrap) {
-  wrap.classList.remove('bubble--text', 'bubble--audio');
-  const hasText = !!wrap.querySelector('.bubble-text');
-  const hasAudio = !!wrap.querySelector('audio');
-  if (hasAudio) wrap.classList.add('bubble--audio');
-  else if (hasText) wrap.classList.add('bubble--text');
-}
-function setBubbleContent(rec, { text, audioSrc, audioType }) {
-  const wrap = rec.element;
-  const contentEl = wrap.querySelector('.bubble-content');
-  if (!contentEl) return;
-
-  // Text update
-  let textEl = contentEl.querySelector('.bubble-text');
-  if (text && text.trim()) {
-    if (!textEl) {
-      textEl = document.createElement('div');
-      textEl.className = 'bubble-text';
-      contentEl.insertBefore(textEl, contentEl.firstChild);
-    }
-    textEl.textContent = text;
-  } else if (textEl) {
-    textEl.remove();
-  }
-
-  // Remove existing audio + custom UI
-  contentEl.querySelectorAll('.audio-ui').forEach(n => n.remove());
-  const oldAudio = contentEl.querySelector('audio');
-  if (oldAudio) oldAudio.remove();
-
-  // Audio update
-  if (audioSrc) {
-    const audio = document.createElement('audio');
-    audio.controls = false;
-    const source = document.createElement('source');
-    source.src = audioSrc;
-    if (audioType) source.type = audioType;
-    audio.appendChild(source);
-    contentEl.appendChild(audio);
-    buildCustomAudioControls(audio, contentEl);
-  }
-
-  // Update type class
-  updateBubbleTypeClass(wrap);
-}
-
-/* Choose a partner to recombine with (prefer same-type) */
-function choosePartner(bubbles, rec) {
-  const candidates = bubbles.filter(b =>
-    b !== rec &&
-    !b.splitting &&
-    !b._hover &&
-    !b.element.classList.contains('bubble--open')
-  );
-  if (!candidates.length) return null;
-
-  const recHasAudio = !!getBubbleAudio(rec);
-  const sameType = candidates.filter(c => !!getBubbleAudio(c) === recHasAudio);
-  const pool = sameType.length ? sameType : candidates;
-  return pool[Math.floor(Math.random() * pool.length)] || null;
-}
-
-/* Recombine text and audio content of two bubbles */
-function recombinePair(aRec, bRec) {
-  // Text recombination
-  const aText = getBubbleText(aRec);
-  const bText = getBubbleText(bRec);
-  let newAText = aText;
-  let newBText = bText;
-  if (aText && bText && aText.length > 1 && bText.length > 1) {
-    const ai = Math.floor(Math.random() * (aText.length - 1)) + 1;
-    const bi = Math.floor(Math.random() * (bText.length - 1)) + 1;
-    newAText = aText.slice(0, ai) + bText.slice(bi);
-    newBText = bText.slice(0, bi) + aText.slice(ai);
-  }
-
-  // Audio recombination (swap/move)
-  const aAud = getBubbleAudio(aRec);
-  const bAud = getBubbleAudio(bRec);
-  let newAAudio = aAud, newBAudio = bAud;
-
-  if (aAud && bAud) {
-    // swap with 50% chance, or keep
-    if (Math.random() < 0.8) { // bias to swap for visible effect
-      newAAudio = bAud;
-      newBAudio = aAud;
-    }
-  } else if (aAud && !bAud) {
-    if (Math.random() < 0.5) { // move from A to B
-      newAAudio = null;
-      newBAudio = aAud;
-    }
-  } else if (!aAud && bAud) {
-    if (Math.random() < 0.5) { // move from B to A
-      newAAudio = bAud;
-      newBAudio = null;
-    }
-  }
-
-  // If the current playing audio is in A/B, pause it before rebuild
-  if (currentAudio) {
-    const aContains = aRec.element.contains(currentAudio);
-    const bContains = bRec.element.contains(currentAudio);
-    if (aContains || bContains) {
-      try { currentAudio.pause(); } catch {}
-      if (currentBtn) {
-        currentBtn.textContent = '▶';
-        currentBtn.classList.remove('is-playing');
-      }
-      currentAudio = null;
-      currentBtn = null;
-    }
-  }
-
-  // Apply updates
-  setBubbleContent(aRec, {
-    text: newAText,
-    audioSrc: newAAudio?.src || '',
-    audioType: newAAudio?.type || ''
-  });
-  setBubbleContent(bRec, {
-    text: newBText,
-    audioSrc: newBAudio?.src || '',
-    audioType: newBAudio?.type || ''
-  });
-}
+/* global cycle timers (avoid duplicates across re-renders) */
+let bubbleCycleTimer = null;
+let expireTimer = null;
+let bubblePhase = 'split';
 
 function renderRows(rows) {
   const container = $('bubbleContainer');
   if (!container) { console.error('❌ Missing #bubbleContainer'); return; }
   container.innerHTML = '';
 
-  // Filter out expired bubbles (older than TTL); data in Drive is unchanged
-  const now = Date.now();
-  const freshRows = (rows || []).filter(r => {
-    const ts = Number(r?.timestamp || 0);
-    return !ts || (now - ts) < BUBBLE_TTL_MS;
-  });
+  /* clear previous timers (app may re-render after submit/load) */
+  if (bubbleCycleTimer) { clearInterval(bubbleCycleTimer); bubbleCycleTimer = null; }
+  if (expireTimer) { clearInterval(expireTimer); expireTimer = null; }
+  bubblePhase = 'split';
 
   const bubbles = [];
   let screenWidth = window.innerWidth;
   let screenHeight = window.innerHeight;
 
-  const textures = [
-    'dreamimages/texture01.png',
-    'dreamimages/texture02.png',
-    'dreamimages/texture03.png'
-  ];
+  /* 30-day filter at render */
+  const NOW = Date.now();
+  const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+  rows = (rows || []).filter(r => {
+    const ts = Number(r.timestamp) || Date.parse(r.timestamp || '') || 0;
+    return ts === 0 || (NOW - ts) <= THIRTY_DAYS_MS;
+  });
 
-  const createBubble = ({ text, timestamp, audioUrl, audioMime, audioData }, idx) => {
+  const createBubble = ({ text, timestamp, audioUrl, audioMime, audioData }, idx, options = {}) => {
     const wrap = document.createElement('div');
     wrap.className = 'bubble';
-    wrap.dataset.timestamp = timestamp || Date.now();
-
-    // New: tag bubble type
-    const hasAudio = !!(audioUrl || audioData);
-    if (hasAudio) {
-      wrap.classList.add('bubble--audio');
-    } else if (text) {
-      wrap.classList.add('bubble--text');
-    }
-
-    // Assign a random texture overlay
-    const randomTexture = textures[Math.floor(Math.random() * textures.length)];
-    wrap.style.setProperty('--bubble-texture', `url(${randomTexture})`);
+    const ts = Number(timestamp) || Date.now();
+    wrap.dataset.timestamp = String(ts);
 
     // Random initial position and slower velocity
-    const bubbleSize = Math.random() * 50 + 50; // Random size between 50px and 100px
+    const isMobile = window.innerWidth <= 768;
+    // Make bubbles a bit smaller on mobile
+    const bubbleSize = isMobile
+      ? (Math.random() * 24 + 28)   // 28–52 (was 36–64)
+      : (Math.random() * 50 + 50);  // 50–100
     const x = Math.random() * (screenWidth - bubbleSize);
     const y = Math.random() * (screenHeight - bubbleSize);
-    const velocityX = (Math.random() - 0.5) * 0.5; // Further reduced velocity between -0.25 and 0.25
+    const velocityX = (Math.random() - 0.5) * 0.5;
     const velocityY = (Math.random() - 0.5) * 0.5;
 
     wrap.style.width = `${bubbleSize}px`;
@@ -758,75 +689,91 @@ function renderRows(rows) {
       meta.textContent = text;
       content.appendChild(meta);
     }
+    let audioEl = null;
     if (audioUrl || audioData) {
-      const audio = document.createElement('audio');
-      audio.controls = false; // custom UI
+      audioEl = document.createElement('audio');
+      audioEl.controls = false; // use custom UI for consistency
       const source = document.createElement('source');
-      const initialAudioSrc = audioData || normalizeDriveUrl(audioUrl.trim());
-      const initialAudioType = audioMime || guessMimeFromUrl(audioUrl);
-      source.src = initialAudioSrc;
-      source.type = initialAudioType;
-      audio.appendChild(source);
-      content.appendChild(audio);
+      source.src = audioData || normalizeDriveUrl((audioUrl || '').trim());
+      source.type = audioMime || guessMimeFromUrl(audioUrl);
+      audioEl.appendChild(source);
+      content.appendChild(audioEl);
 
-      // Refactor: build audio UI via helper
-      buildCustomAudioControls(audio, content);
+      // attach custom audio UI initially
+      const custom = buildCustomAudioUI(audioEl);
+      content.appendChild(custom);
     }
 
     wrap.appendChild(content);
     container.appendChild(wrap);
 
     // Track this bubble
-    const rec = { element: wrap, x, y, velocityX, velocityY, size: bubbleSize, splitting: false, _hover: false };
+    const rec = {
+      element: wrap, x, y, velocityX, velocityY, size: bubbleSize,
+      createdAt: ts,
+      isSplitPart: !!options.isSplitPart,
+      kind: audioEl ? 'audio' : 'text',
+      segmentPct: options.segmentPct || null // [startPct, endPct] for audio
+    };
     bubbles.push(rec);
-
-    // Ensure type class is accurate after content is added
-    updateBubbleTypeClass(wrap);
 
     // Pause motion + precisely expand to fit all content on hover
     const initial = { width: bubbleSize, height: bubbleSize };
-
     wrap.addEventListener('mouseenter', () => {
-      rec._hover = true;
-      // pause movement
+      // raise this bubble to topmost layer while open
+      wrap.style.zIndex = '5000';
       rec._vx = rec.velocityX; rec._vy = rec.velocityY;
       rec.velocityX = 0; rec.velocityY = 0;
 
-      // enable measuring (children laid out but invisible)
       wrap.classList.add('bubble--measuring');
-
       const contentEl = wrap.querySelector('.bubble-content');
       if (!contentEl) return;
 
-      // IMPORTANT: remove tiny fixed size so content can define size
+      // Segment playback guards for audio (apply once)
+      if (audioEl && rec.segmentPct && !rec._segBound) {
+        const [sp, ep] = rec.segmentPct;
+        const useSegment = () => {
+          const d = audioEl.duration || 0;
+          if (!isFinite(d) || d <= 0) return { start: 0, end: d };
+          return { start: d * sp, end: d * ep };
+        };
+        audioEl.addEventListener('play', () => {
+          const { start } = useSegment();
+          try { if (!isNaN(start)) audioEl.currentTime = start; } catch(_) {}
+        });
+        audioEl.addEventListener('timeupdate', () => {
+          const { end } = useSegment();
+          if (isFinite(end) && end > 0 && audioEl.currentTime > end) audioEl.pause();
+        });
+        rec._segBound = true;
+      }
+
+      // remove small size to measure
       wrap.style.width = 'auto';
       wrap.style.height = 'auto';
       wrap.style.maxWidth = '90vw';
       wrap.style.maxHeight = '90vh';
 
-      // readable max measure width
       const maxMeasureWidth = Math.min(window.innerWidth * 0.9, 720);
       contentEl.style.maxWidth = maxMeasureWidth + 'px';
 
-      // force reflow to get correct sizes (incl. audio)
+      // Force reflow
       // eslint-disable-next-line no-unused-expressions
       contentEl.offsetWidth;
 
-      const padding = 16; // keep in sync with CSS .bubble--open padding
+      const padding = 16;
       const rect = contentEl.getBoundingClientRect();
       const targetW = Math.ceil(rect.width) + padding * 2;
       const targetH = Math.ceil(rect.height) + padding * 2;
-
       const finalW = Math.min(targetW, Math.floor(window.innerWidth * 0.9));
       const finalH = Math.min(targetH, Math.floor(window.innerHeight * 0.9));
 
-      // apply exact size and open visuals
       wrap.style.width = finalW + 'px';
       wrap.style.height = finalH + 'px';
       wrap.classList.add('bubble--open');
       wrap.classList.remove('bubble--measuring');
 
-      // keep fully on-screen
+      // Clamp to viewport
       const right = rec.x + finalW;
       const bottom = rec.y + finalH;
       const deltaX = Math.max(0, right - window.innerWidth + 8);
@@ -838,39 +785,252 @@ function renderRows(rows) {
     });
 
     wrap.addEventListener('mouseleave', () => {
-      rec._hover = false;
-      // resume movement
       rec.velocityX = rec._vx ?? rec.velocityX;
       rec.velocityY = rec._vy ?? rec.velocityY;
-
-      // restore original small bubble look
       wrap.classList.remove('bubble--open', 'bubble--measuring');
       wrap.style.maxWidth = '';
       wrap.style.maxHeight = '';
       wrap.style.width = initial.width + 'px';
       wrap.style.height = initial.height + 'px';
+      // restore z-index after closing
+      wrap.style.zIndex = '';
     });
 
     return wrap;
   };
 
-  // Use filtered rows (client-side TTL)
-  freshRows.forEach(({ text, timestamp, audioUrl, audioMime, audioData }, idx) => {
+  const removeRec = (rec) => {
+    try { rec.element.remove(); } catch(_) {}
+    const i = bubbles.indexOf(rec);
+    if (i >= 0) bubbles.splice(i, 1);
+  };
+
+  const pickTwo = (arr) => {
+    if (arr.length < 2) return null;
+    const i = Math.floor(Math.random() * arr.length);
+    let j = Math.floor(Math.random() * (arr.length - 1));
+    if (j >= i) j += 1;
+    return [arr[i], arr[j]];
+  };
+
+  // Helper: tokenize into words; prefer whitespace-separated words, fallback to punctuation groups.
+  const tokenizeWords = (s) => {
+    if (!s) return [];
+    // 1) whitespace-separated tokens
+    const ws = s.trim().split(/\s+/).filter(Boolean);
+    if (ws.length >= 2) return ws;
+    // 2) fallback: split by common punctuation groups (useful for CJK sentences)
+    const byPunc = s.split(/([，。！？、；：,.!?;:]+)/).map(t => t.trim()).filter(Boolean);
+    if (byPunc.length >= 2) return byPunc;
+    // No reliable “word” boundary found
+    return [];
+  };
+
+  // Word-based split; returns [part1, part2] or null if cannot split by words
+  const splitTextByWords = (s) => {
+    const tokens = tokenizeWords(s);
+    if (tokens.length < 2) return null;
+    const i = Math.floor(rand(1, tokens.length)); // split index between words
+    return [tokens.slice(0, i).join(' '), tokens.slice(i).join(' ')];
+  };
+
+  // render initial
+  rows.forEach(({ text, timestamp, audioUrl, audioMime, audioData }, idx) => {
     if (!text && !audioUrl && !audioData) return;
     createBubble({ text, timestamp, audioUrl, audioMime, audioData }, idx);
   });
 
+  // Text: 2→2 cross recombine in place
+  const doTextCycleRecombine = () => {
+    const texts = bubbles.filter(b => b.kind === 'text');
+    if (texts.length < 2) return;
+
+    const pool = texts.slice().sort(() => Math.random() - 0.5);
+
+    // 使用空白优先，CJK 标点回退，保证中文没有空格时也能拆
+    const splitByWords = (s) => {
+      const raw = (s || '').trim();
+      if (!raw) return null;
+      const bySpace = raw.split(/\s+/).filter(Boolean);
+      if (bySpace.length >= 2) return bySpace;
+      const byPunc = raw.split(/([，。！？、；：,.!?;:]+)/).map(t => t.trim()).filter(Boolean);
+      return byPunc.length >= 2 ? byPunc : null;
+    };
+
+    while (pool.length >= 2) {
+      const a = pool.pop();
+      const b = pool.pop();
+
+      const ensureText = (rec) => {
+        let el = rec.element.querySelector('.bubble-text');
+        if (!el) {
+          el = document.createElement('div');
+          el.className = 'bubble-text';
+          rec.element.querySelector('.bubble-content').appendChild(el);
+        }
+        return el;
+      };
+
+      const aTextEl = ensureText(a);
+      const bTextEl = ensureText(b);
+
+      const aText = (aTextEl.textContent || '').trim();
+      const bText = (bTextEl.textContent || '').trim();
+
+      const aParts = splitByWords(aText);
+      const bParts = splitByWords(bText);
+
+      let outA = '';
+      let outB = '';
+
+      if (aParts && bParts) {
+        const aMid = Math.max(1, Math.floor(aParts.length / 2));
+        const bMid = Math.max(1, Math.floor(bParts.length / 2));
+        const a1 = aParts.slice(0, aMid).join(' ');
+        const a2 = aParts.slice(aMid).join(' ');
+        const b1 = bParts.slice(0, bMid).join(' ');
+        const b2 = bParts.slice(bMid).join(' ');
+        const ai = Math.random() < 0.5 ? 0 : 1;
+        const bi = Math.random() < 0.5 ? 0 : 1;
+        const pickA = ai === 0 ? a1 : a2, restA = ai === 0 ? a2 : a1;
+        const pickB = bi === 0 ? b1 : b2, restB = bi === 0 ? b2 : b1;
+
+        outA = `${pickA} ${pickB}`.trim();
+        outB = `${restA} ${restB}`.trim();
+      } else {
+        outA = [aText, bText].filter(Boolean).join(' ').trim();
+        outB = [bText, aText].filter(Boolean).join(' ').trim();
+      }
+
+      aTextEl.textContent = outA || ' ';
+      bTextEl.textContent = outB || ' ';
+
+      [a.element, b.element].forEach(w => {
+        w.classList.add('bubble--split');
+        setTimeout(() => w.classList.remove('bubble--split'), 800);
+      });
+    }
+  };
+
+  // Audio helper: attach a single sequential player to container
+  function attachSequentialPlayer(container, parts) {
+    [...container.querySelectorAll('audio')].forEach(a => a.remove());
+    // Remove old custom UIs if any
+    [...container.querySelectorAll('.audio-ui')].forEach(el => el.remove());
+
+    const player = document.createElement('audio');
+    player.preload = 'metadata';
+    container.appendChild(player);
+
+    // Build and attach custom UI
+    const ui = buildCustomAudioUI(player);
+    container.appendChild(ui);
+
+    let idx = 0;
+    function load(i, autoplay) {
+      const p = parts[i];
+      if (!p) return;
+      player.src = p.src;
+      const onMeta = () => {
+        try { player.currentTime = (isFinite(p.start) ? p.start : 0) || 0; } catch(_) {}
+        if (autoplay) player.play().catch(()=>{});
+        player.removeEventListener('loadedmetadata', onMeta);
+      };
+      player.addEventListener('loadedmetadata', onMeta);
+    }
+
+    player.addEventListener('timeupdate', () => {
+      const p = parts[idx];
+      if (!p) return;
+      if (isFinite(p.end) && p.end > 0 && player.currentTime >= p.end - 0.02) {
+        if (idx + 1 < parts.length) {
+          idx += 1; load(idx, true);
+        } else {
+          player.pause();
+        }
+      }
+    });
+
+    player.addEventListener('ended', () => {
+      if (idx + 1 < parts.length) { idx += 1; load(idx, true); }
+    });
+
+    load(0, false);
+  }
+
+  // Audio: 2→2 in-place recombine by rules
+  const doAudioCycleRecombine = () => {
+    const list = bubbles.filter(b => b.kind === 'audio');
+    if (list.length < 2) return;
+
+    const pool = list.slice().sort(() => Math.random() - 0.5);
+
+    const getAudioMeta = (rec) => {
+      const el = rec.element.querySelector('audio');
+      const src = el?.querySelector('source')?.src || el?.src || '';
+      const type = el?.querySelector('source')?.type || '';
+      const dur = el?.duration;
+      if (!src || !isFinite(dur) || dur <= 0) return null;
+      return { src, type, dur };
+    };
+
+    while (pool.length >= 2) {
+      const a = pool.pop();
+      const b = pool.pop();
+
+      const ma = getAudioMeta(a);
+      const mb = getAudioMeta(b);
+      if (!ma || !mb) continue;
+
+      if (ma.dur < 5 || mb.dur < 5) continue;
+
+      const aCanSplit = ma.dur >= 10;
+      const bCanSplit = mb.dur >= 10;
+
+      const aSegs = aCanSplit
+        ? [{src:ma.src,type:ma.type,start:0,end:ma.dur/2},{src:ma.src,type:ma.type,start:ma.dur/2,end:ma.dur}]
+        : [{src:ma.src,type:ma.type,start:0,end:ma.dur}];
+
+      const bSegs = bCanSplit
+        ? [{src:mb.src,type:mb.type,start:0,end:mb.dur/2},{src:mb.src,type:mb.type,start:mb.dur/2,end:mb.dur}]
+        : [{src:mb.src,type:mb.type,start:0,end:mb.dur}];
+
+      let seq1, seq2;
+      if (aSegs.length === 2 && bSegs.length === 2) {
+        const ai = Math.random() < 0.5 ? 0 : 1;
+        const bi = Math.random() < 0.5 ? 0 : 1;
+        const aPick = aSegs[ai],  aRest = aSegs[1 - ai];
+        const bPick = bSegs[bi],  bRest = bSegs[1 - bi];
+        seq1 = [aPick, bPick];
+        seq2 = [aRest, bRest];
+      } else if (aSegs.length === 2 && bSegs.length === 1) {
+        seq1 = [aSegs[0], bSegs[0]];
+        seq2 = [aSegs[1], bSegs[0]];
+      } else if (aSegs.length === 1 && bSegs.length === 2) {
+        seq1 = [aSegs[0], bSegs[0]];
+        seq2 = [aSegs[0], bSegs[1]];
+      } else {
+        seq1 = [aSegs[0], bSegs[0]];
+        seq2 = [bSegs[0], aSegs[0]];
+      }
+
+      const ca = a.element.querySelector('.bubble-content');
+      const cb = b.element.querySelector('.bubble-content');
+      if (ca) attachSequentialPlayer(ca, seq1);
+      if (cb) attachSequentialPlayer(cb, seq2);
+
+      [a.element, b.element].forEach(w => {
+        w.classList.add('bubble--split');
+        setTimeout(() => w.classList.remove('bubble--split'), 800);
+      });
+    }
+  };
+
   // Animate bubbles
   function animateBubbles() {
     bubbles.forEach((bubble) => {
-      // Skip movement while splitting
-      if (bubble.splitting) return;
-
-      // Update position
       bubble.x += bubble.velocityX;
       bubble.y += bubble.velocityY;
-
-      // Bounce off edges
       if (bubble.x <= 0 || bubble.x + bubble.size >= screenWidth) {
         bubble.velocityX *= -1;
         bubble.x = Math.max(0, Math.min(bubble.x, screenWidth - bubble.size));
@@ -879,127 +1039,52 @@ function renderRows(rows) {
         bubble.velocityY *= -1;
         bubble.y = Math.max(0, Math.min(bubble.y, screenHeight - bubble.size));
       }
-
-      // Apply updated position
       bubble.element.style.left = `${bubble.x}px`;
       bubble.element.style.top = `${bubble.y}px`;
     });
-
     requestAnimationFrame(animateBubbles);
   }
-
   animateBubbles();
-
-  // Periodic split/regroup effect
-  function splitBubble(rec) {
-    if (!rec || rec.splitting) return;
-    if (rec.element.classList.contains('bubble--open') || rec._hover) return;
-
-    rec.splitting = true;
-
-    // pause motion
-    rec._vx = rec.velocityX; rec._vy = rec.velocityY;
-    rec.velocityX = 0; rec.velocityY = 0;
-
-    // Hide original bubble during split
-    const original = rec.element;
-    const prevVis = original.style.visibility;
-    original.style.visibility = 'hidden';
-
-    const centerX = rec.x + rec.size / 2;
-    const centerY = rec.y + rec.size / 2;
-
-    const shardCount = Math.floor(Math.random() * (SHARD_COUNT_MAX - SHARD_COUNT_MIN + 1)) + SHARD_COUNT_MIN;
-    const shards = [];
-    for (let i = 0; i < shardCount; i++) {
-      const shard = document.createElement('div');
-      shard.className = 'bubble-shard';
-      // start at center
-      shard.style.left = `${centerX}px`;
-      shard.style.top = `${centerY}px`;
-      container.appendChild(shard);
-
-      // target direction
-      const angle = Math.random() * Math.PI * 2;
-      const radius = Math.random() * Math.max(40, rec.size / 1.8) + 20;
-      const target = { x: centerX + Math.cos(angle) * radius, y: centerY + Math.sin(angle) * radius };
-      shards.push({ el: shard, start: { x: centerX, y: centerY }, mid: target });
-    }
-
-    const startTime = performance.now();
-    const half = SPLIT_DURATION_MS / 2;
-
-    function animate(now) {
-      const t = now - startTime;
-
-      if (t <= SPLIT_DURATION_MS) {
-        shards.forEach(s => {
-          let x, y;
-          if (t <= half) {
-            // outwards [0..1]
-            const p = t / half;
-            x = s.start.x + (s.mid.x - s.start.x) * p;
-            y = s.start.y + (s.mid.y - s.start.y) * p;
-          } else {
-            // inwards [0..1]
-            const p = (t - half) / half;
-            x = s.mid.x + (s.start.x - s.mid.x) * p;
-            y = s.mid.y + (s.start.y - s.mid.y) * p;
-          }
-          s.el.style.left = `${x}px`;
-          s.el.style.top = `${y}px`;
-        });
-        requestAnimationFrame(animate);
-      } else {
-        // cleanup shards
-        shards.forEach(s => s.el.remove());
-
-        // New: pick a partner and recombine content
-        const partner = choosePartner(bubbles, rec);
-        if (partner) {
-          try { recombinePair(rec, partner); } catch (e) { console.warn('Recombine failed', e); }
-        }
-
-        // restore original bubble
-        original.style.visibility = prevVis || 'visible';
-        // resume motion
-        rec.velocityX = rec._vx ?? rec.velocityX;
-        rec.velocityY = rec._vy ?? rec.velocityY;
-        rec.splitting = false;
-      }
-    }
-    requestAnimationFrame(animate);
-  }
-
-  // Try to split a random bubble at intervals
-  const splitTimer = setInterval(() => {
-    if (!bubbles.length) return;
-    const candidates = bubbles.filter(b => !b.splitting && !b.element.classList.contains('bubble--open') && !b._hover);
-    if (!candidates.length) return;
-    const pick = candidates[Math.floor(Math.random() * candidates.length)];
-    splitBubble(pick);
-  }, SPLIT_INTERVAL_MS);
 
   // Update screen dimensions on resize
   window.addEventListener('resize', () => {
     screenWidth = window.innerWidth;
     screenHeight = window.innerHeight;
-    // Ensure bubbles remain within the new screen dimensions
     bubbles.forEach((bubble) => {
       bubble.x = Math.max(0, Math.min(bubble.x, screenWidth - bubble.size));
       bubble.y = Math.max(0, Math.min(bubble.y, screenHeight - bubble.size));
     });
   });
 
-  // Optional: clear interval when a new render happens (container is re-rendered each load)
-  container._splitTimer && clearInterval(container._splitTimer);
-  container._splitTimer = splitTimer;
+  // 先立即跑一轮文字分裂重组（加载后立刻可见）
+  try { doTextCycleRecombine(); } catch {}
+
+  // Update the timer to call both new cycles
+  if (bubbleCycleTimer) { clearInterval(bubbleCycleTimer); bubbleCycleTimer = null; }
+  bubbleCycleTimer = setInterval(() => {
+    try {
+      doTextCycleRecombine();
+      doAudioCycleRecombine();
+    } catch (e) {
+      console.warn('bubble cycle error:', e);
+    }
+  }, 20000);
+
+  // periodic expiry cleanup (every 60s)
+  expireTimer = setInterval(() => {
+    const cutoff = Date.now() - THIRTY_DAYS_MS;
+    // remove DOM bubbles older than cutoff
+    [...bubbles].forEach(b => {
+      const ts = Number(b.element.dataset.timestamp) || 0;
+      if (ts && ts < cutoff) removeRec(b);
+    });
+  }, 60000);
 }
 
 /* ============ 其他功能 ============ */
 async function checkMicPermissions() {
   try { await navigator.mediaDevices.getUserMedia({ audio: true }); }
-  catch (err) { console.error('无法访问麦克风', err); alert('无法访问麦克风，请检查浏览器权限'); }
+  catch (err) { console.error('Cannot access microphone', err); alert('Cannot access microphone. Please check browser permissions.'); }
 }
 function blobToDataURL(blob) {
   return new Promise((res, rej) => {
@@ -1012,7 +1097,25 @@ function blobToDataURL(blob) {
 
 /* ============ 事件绑定 ============ */
 document.addEventListener('DOMContentLoaded', () => {
-  loadFromGAS().catch(() => setStatus('服务不可用（初始化失败）'));
+  installAudioUnlockOnce(); // set up unlock on first user gesture
+  setStatus('Loading…', 'info');
+  setGlobalLoading(true);
+
+  // Faster, non-blocking loader: min 600ms to avoid flicker, max 1200ms hard cap
+  const t0 = performance.now();
+  const LOADER_MIN_MS = 600;
+  const LOADER_MAX_MS = 1200;
+  let overlayHidden = false;
+  const hideOverlay = () => { if (!overlayHidden) { overlayHidden = true; setGlobalLoading(false); } };
+  const maxTimer = setTimeout(hideOverlay, LOADER_MAX_MS);
+
+  loadFromGAS()
+    .catch(() => {})
+    .finally(() => {
+      const elapsed = performance.now() - t0;
+      const wait = Math.max(0, LOADER_MIN_MS - elapsed);
+      setTimeout(() => { clearTimeout(maxTimer); hideOverlay(); }, wait);
+    });
 
   // Initialize slider progress once on load
   const el = ui.pitch?.();
@@ -1029,28 +1132,33 @@ document.addEventListener('DOMContentLoaded', () => {
   $('recStop')?.addEventListener('click', async () => {
     const procBlob = await stopRec();
     if (!procBlob || !(procBlob instanceof Blob) || procBlob.size === 0) {
-      alert('录音为空或失败，请重试'); return;
+      alert('Recording is empty or failed. Please try again.'); return;
     }
 
-    // New: no FFmpeg by default. Use the recorder's native type and derive extension.
-    const type = (procBlob.type || 'audio/webm').toLowerCase();
-    const outExt =
-      type.includes('mp4') || type.includes('aac') ? 'm4a' :
-      type.includes('ogg') ? 'ogg' :
-      type.includes('webm') ? 'webm' :
-      'webm';
-    const outMime = type || (outExt === 'm4a' ? 'audio/mp4' : outExt === 'ogg' ? 'audio/ogg' : 'audio/webm');
+    // Transcode first (for consistent preview/share)
+    const targetExt = 'mp3';
+    let out = { blob: procBlob, mime: procBlob.type || 'audio/webm', ext: 'webm' };
+    try { out = await transcodeToTarget(procBlob, targetExt); }
+    catch (e) { console.warn('Transcoding failed, will upload original format:', e); }
 
-    const dataURL = await blobToDataURL(procBlob);
+    // Show confirm modal with audio preview; only upload if user shares
+    const previewUrl = URL.createObjectURL(out.blob);
+    const choice = await showAudioShareConfirm({ url: previewUrl });
+    if (choice !== 'share') {
+      // delete/cancel: do not upload
+      return;
+    }
+
+    // Proceed to share
+    const dataURL = await blobToDataURL(out.blob);
     await submitToGAS({
       text: ($('bubbleText')?.value || '').trim(),
       audioB64: dataURL,
-      audioMime: outMime,
-      filename: `recording_${Date.now()}.${outExt}`
+      audioMime: out.mime || 'audio/webm',
+      filename: `recording_${Date.now()}.${out.ext}`
     });
     if ($('bubbleText')) $('bubbleText').value = '';
-    const ok = await loadFromGAS();
-    if (!ok) setStatus('已提交，但读取失败（稍后自动重试）');
+    await loadFromGAS();
   });
 
   $('generateBubble')?.addEventListener('click', async () => {
@@ -1058,51 +1166,65 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!text) return;
     await submitToGAS({ text });
     if ($('bubbleText')) $('bubbleText').value = '';
-    const ok = await loadFromGAS();
-    if (!ok) setStatus('已提交，但读取失败（稍后自动重试）');
+    await loadFromGAS();
   });
 
-  /* Updated: toggle Test Mic on/off, without touching the Tone.js mic */
   $('testMic')?.addEventListener('click', async () => {
-    const btn = $('testMic');
-    const el = $('micMonitor');
-
-    // If already testing, stop and clean up
-    if (testMicStream) {
-      try { testMicStream.getTracks().forEach(t => t.stop()); } catch {}
-      testMicStream = null;
-      if (el) {
-        el.pause();
-        el.srcObject = null;
-        el.style.display = 'none';
-      }
-      if (btn) btn.textContent = 'Test Mic';
-      return;
-    }
-
-    // Start monitoring
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      testMicStream = stream;
-      if (el) {
-        el.srcObject = stream;
-        el.style.display = 'block';
-        await el.play().catch(() => {});
-      }
-      if (btn) btn.textContent = 'Stop Test';
+      const el = $('micMonitor');
+      if (!el) return;
+
+      // stop previous stream if exists
+      try { el.srcObject?.getTracks()?.forEach(t => t.stop()); } catch(_) {}
+      el.srcObject = null;
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+      });
+
+      el.srcObject = stream;
+      el.muted = false;               // let user hear the mic
+      el.volume = 1.0;
+      el.autoplay = true;
+      el.setAttribute('playsinline', '');
+      el.controls = false;
+      el.style.display = 'none';
+
+      // remove previous custom UI if any
+      const prev = document.getElementById('micMonitorUI');
+      if (prev) prev.remove();
+
+      const ui = buildCustomAudioUI(el, { live: true });
+      ui.id = 'micMonitorUI';
+      el.parentNode?.insertBefore(ui, el.nextSibling);
+
+      // Try native element playback first; if blocked, route via WebAudio
+      await el.play().catch(async () => {
+        const ac = (window.Tone?.getContext?.()?.rawContext) ||
+                   new (window.AudioContext || window.webkitAudioContext)();
+        try { if (window.Tone?.start) await Tone.start(); } catch(_) {}
+        try { await ac.resume?.(); } catch(_) {}
+
+        // Create MediaStream source -> (gain) -> destination
+        const src = ac.createMediaStreamSource
+          ? ac.createMediaStreamSource(stream)
+          : new MediaStreamAudioSourceNode(ac, { mediaStream: stream });
+        const gain = ac.createGain ? ac.createGain() : null;
+        if (gain) {
+          gain.gain.value = 1;
+          src.connect(gain);
+          gain.connect(ac.destination);
+        } else {
+          src.connect(ac.destination);
+        }
+        // Store nodes for UI stop/toggle
+        el._ctxNodes = { ctx: ac, src, gain };
+
+        // Update UI to "playing" state
+        el.dispatchEvent(new Event('play'));
+      });
     } catch (e) {
-      alert('无法访问麦克风，请检查权限');
+      alert('Cannot access microphone. Please check permissions.');
     }
   });
-});
-
-// Clean up streams on page exit
-window.addEventListener('beforeunload', () => {
-  if (testMicStream) {
-    try { testMicStream.getTracks().forEach(t => t.stop()); } catch {}
-  }
-  if (micOpen && mic?.close) {
-    try { mic.close(); } catch {}
-    micOpen = false;
-  }
 });
