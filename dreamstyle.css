@@ -13,12 +13,46 @@
 
 /* Remove fixed position from #controls for proper centering */
 #controls {
-  position: static;
-  top: unset;
-  left: unset;
-  transform: none;
-  z-index: auto;
+  position: relative; /* for glossy overlay */
+  top: 25%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(180deg, rgba(255,255,255,0.78), rgba(255,255,255,0.58));
+  backdrop-filter: blur(10px);
+  padding: 14px 18px;
+  border-radius: 28px;
+  border: 1px solid rgba(255,255,255,0.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.6),
+    0 2px 6px rgba(0,0,0,0.08),
+    0 12px 30px rgba(0,0,0,0.16);
+  transition: box-shadow .25s ease, background .25s ease;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+  z-index: 900;
 }
+#controls:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.65),
+    0 4px 10px rgba(0,0,0,0.10),
+    0 16px 36px rgba(0,0,0,0.18);
+}
+/* glossy highlight */
+#controls::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 80% at 12% 0%, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.35) 30%, transparent 60%);
+  mix-blend-mode: screen;
+  opacity: .7;
+}
+
 @font-face {
   font-family: 'Dreamer TM';
   src: url('./dreamimages/Dreamer TM.otf') format('opentype');
@@ -89,37 +123,37 @@ html, body {
 }
 
 /* 控件区（按钮/输入） */
-#controls {
-  position: fixed;
-  top: 25%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(255,255,255,0.2);
-  backdrop-filter: blur(10px);
-  padding: 14px 18px;
-  border-radius: 16px;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.12);
-  z-index: 900;
-}
 #controls input[type="text"],
 #controls button {
   font-size: 16px;
   height: 40px;
   padding: 8px 14px;
-  border-radius: 22px;
-  border: 1px solid rgba(200,200,200,0.5);
-  background: rgba(255,255,255,0.6);
-  color: #444;
-  transition: .2s ease;
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,0.06);
+  background: linear-gradient(180deg, #ffffff, #f7f7f7);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.9),
+    0 1px 3px rgba(0,0,0,0.08);
+  transition: background .2s ease, box-shadow .2s ease, transform .15s ease;
 }
+#controls input[type="text"]::placeholder { color: #7a7a7a; }
+
 #controls button { cursor: pointer; }
 #controls button:hover {
   transform: scale(1.02);
-  background: rgba(169, 188, 221, 0.75);
+  background: linear-gradient(180deg, #f9fbff, #eef3ff);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.95),
+    0 2px 6px rgba(0,0,0,0.12);
+}
+
+#controls input[type="text"]:focus-visible,
+#controls button:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 3px rgba(107,140,255,0.22),
+    0 2px 6px rgba(0,0,0,0.12),
+    inset 0 1px 0 rgba(255,255,255,0.95);
 }
 
 /* Neutralize WebKit autofill styling so it doesn’t show odd colors */
@@ -626,69 +660,69 @@ html, body {
 
   /* Voice controls: full width and wrapping labels */
   .voice-controls {
-    width: calc(100% - 12px) !important;
-    padding: 8px !important;
+    width: calc(100% - 12px) !重要;
+    padding: 8px !重要;
   }
   .vc-row {
-    width: 100% !important;
-    justify-content: space-between !important;
-    gap: 8px !important;
-    flex-direction: column !important;
-    align-items: flex-start !important;
+    width: 100% !重要;
+    justify-content: space-between !重要;
+    gap: 8px !重要;
+    flex-direction: column !重要;
+    align-items: flex-start !重要;
   }
   .vc-label {
-    width: auto !important;
-    min-width: 0 !important;
-    white-space: normal !important;
-    overflow-wrap: anywhere !important;
-    text-align: left !important;
-    font-size: 12px !important;
+    width: auto !重要;
+    min-width: 0 !重要;
+    white-space: normal !重要;
+    overflow-wrap: anywhere !重要;
+    text-align: left !重要;
+    font-size: 12px !重要;
   }
-  #uiPitch { width: 100% !important; }
+  #uiPitch { width: 100% !重要; }
 
   /* Bubbles: remain under UI; opened bubbles are handled by .bubble--open z-index */
   #bubbleContainer {
     /* keep fixed as desktop to avoid jumpiness */
-    overflow: hidden !important;
-    height: 100vh !important;
+    overflow: hidden !重要;
+    height: 100vh !重要;
   }
   #bubbleContainer .bubble {
-    width: 60px !important;
-    height: 60px !important;
-    z-index: 1 !important;
+    width: 60px !重要;
+    height: 60px !重要;
+    z-index: 1 !重要;
     transition: all 0.25s ease-out;
   }
   .bubble--open {
-    max-width: 95vw !important;
-    max-height: 80vh !important;
-    z-index: 5000 !important;
-    overflow: auto !important;
+    max-width: 95vw !重要;
+    max-height: 80vh !重要;
+    z-index: 5000 !重要;
+    overflow: auto !重要;
   }
 
   /* Audio UI: stack neatly and fill width */
   .audio-ui {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
-    width: 100% !important;
-    font-size: 13px !important;
-    gap: 6px !important;
+    display: flex !重要;
+    flex-direction: column !重要;
+    align-items: stretch !重要;
+    width: 100% !重要;
+    font-size: 13px !重要;
+    gap: 6px !重要;
   }
   .audio-ui button {
-    width: 36px !important;
-    height: 36px !important;
-    font-size: 14px !important;
+    width: 36px !重要;
+    height: 36px !重要;
+    font-size: 14px !重要;
   }
-  .audio-progress { width: 100% !important; }
+  .audio-progress { width: 100% !重要; }
 
   /* Loader text sizing */
-  #globalLoading { font-size: 16px !important; }
+  #globalLoading { font-size: 16px !重要; }
 }
 
 /* Tiny phones */
 @media (max-width: 420px) {
-  html, body, * { letter-spacing: 0.01em !important; }
-  #controls { width: calc(100% - 12px) !important; }
+  html, body, * { letter-spacing: 0.01em !重要; }
+  #controls { width: calc(100% - 12px) !重要; }
 }
 
 /* Modern thin range slider for #uiPitch */
@@ -920,71 +954,71 @@ html, body {
     width: 100dvw !important;
     max-width: 100dvw !important;
     padding: 12px var(--page-pad) !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 10px !important;
-    box-sizing: border-box !important;
+    flex-direction: column !重要;
+    align-items: stretch !重要;
+    gap: 10px !重要;
+    box-sizing: border-box !重要;
   }
   #controls input[type="text"],
   #controls button,
   #bubbleText,
   textarea {
-    width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-    font-size: 16px !important; /* readable on mobile */
+    width: 100% !重要;
+    max-width: 100% !重要;
+    box-sizing: border-box !重要;
+    font-size: 16px !重要; /* readable on mobile */
   }
 
   /* Voice controls: full width bar */
   .voice-controls {
-    position: sticky !important;
-    top: 0 !important;
-    left: 0 !important;
-    transform: none !important;
-    width: 100dvw !important;
-    max-width: 100dvw !important;
-    padding: 8px var(--page-pad) !important;
-    border-radius: 0 !important;
-    max-width: none !important;
-    box-sizing: border-box !important;
+    position: sticky !重要;
+    top: 0 !重要;
+    left: 0 !重要;
+    transform: none !重要;
+    width: 100dvw !重要;
+    max-width: 100dvw !重要;
+    padding: 8px var(--page-pad) !重要;
+    border-radius: 0 !重要;
+    max-width: none !重要;
+    box-sizing: border-box !重要;
   }
   .vc-row {
-    width: 100% !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 8px !important;
+    width: 100% !重要;
+    flex-direction: column !重要;
+    align-items: stretch !重要;
+    gap: 8px !重要;
   }
   .vc-label {
-    width: auto !important;
-    min-width: 0 !important;
-    white-space: normal !important;
-    overflow-wrap: anywhere !important;
-    text-align: left !important;
-    font-size: 13px !important;
+    width: auto !重要;
+    min-width: 0 !重要;
+    white-space: normal !重要;
+    overflow-wrap: anywhere !重要;
+    text-align: left !重要;
+    font-size: 13px !重要;
   }
-  #uiPitch { width: 100% !important; }
+  #uiPitch { width: 100% !重要; }
 
   /* Bubbles remain under UI; opened bubbles already lift above */
   #bubbleContainer {
     overflow: hidden !重要;
-    height: 100dvh !important;
+    height: 100dvh !重要;
   }
   #bubbleContainer .bubble {
-    width: 60px !important;
-    height: 60px !important;
-    z-index: 1 !important;
+    width: 60px !重要;
+    height: 60px !重要;
+    z-index: 1 !重要;
     transition: all 0.25s ease-out;
   }
 
   /* Audio UI: fill width neatly */
   .audio-ui {
-    flex-direction: column !important;
-    align-items: stretch !important;
-    width: 100% !important;
-    gap: 6px !important;
-    font-size: 14px !important;
+    flex-direction: column !重要;
+    align-items: stretch !重要;
+    width: 100% !重要;
+    gap: 6px !重要;
+    font-size: 14px !重要;
   }
-  .audio-progress { width: 100% !important; }
+  .audio-progress { width: 100% !重要; }
 }
 
 @media (max-width: 420px) {
@@ -994,26 +1028,26 @@ html, body {
 
 /* Make mobile UI a bit smaller while keeping full width */
 @media (max-width: 768px) {
-  body { font-size: 14px !important; }
-  .ui-center { gap: 16px !important; }
+  body { font-size: 14px !重要; }
+  .ui-center { gap: 16px !重要; }
 
   #controls input[type="text"],
   #controls button {
-    height: 34px !important;
-    padding: 6px 10px !important;
-    font-size: 13px !important;
-    border-radius: 16px !important;
+    height: 34px !重要;
+    padding: 6px 10px !重要;
+    font-size: 13px !重要;
+    border-radius: 16px !重要;
   }
 
-  .voice-controls { gap: 10px !important; }
-  .vc-label { font-size: 11px !important; }
+  .voice-controls { gap: 10px !重要; }
+  .vc-label { font-size: 11px !重要; }
 
   /* Audio UI smaller */
-  .audio-ui { font-size: 12px !important; gap: 6px !important; }
+  .audio-ui { font-size: 12px !重要; gap: 6px !重要; }
   .audio-ui button,
   .audio-play { width: 32px !重要; height: 32px !重要; }
 
-  .audio-time { font-size: 11px !important; }
+  .audio-time { font-size: 11px !重要; }
 
   /* Smaller thumbs on sliders */
   #uiPitch::-webkit-slider-thumb { width: 14px; height: 14px; margin-top: -5px; }
@@ -1021,18 +1055,18 @@ html, body {
 }
 
 @media (max-width: 420px) {
-  body { font-size: 13px !important; }
+  body { font-size: 13px !重要; }
 
   #controls input[type="text"],
   #controls button {
-    height: 32px !important;
-    font-size: 12px !important;
-    padding: 5px 10px !important;
+    height: 32px !重要;
+    font-size: 12px !重要;
+    padding: 5px 10px !重要;
   }
 
-  .audio-ui { font-size: 11.5px !important; }
+  .audio-ui { font-size: 11.5px !重要; }
   .audio-ui button,
-  .audio-play { width: 28px !important; height: 28px !important; }
+  .audio-play { width: 28px !重要; height: 28px !重要; }
 
   /* Smaller progress thumb for tight screens */
   .audio-progress::-webkit-slider-thumb { width: 14px; height: 14px; margin-top: -5px; }
@@ -1042,41 +1076,41 @@ html, body {
 /* Do not force bubble size on mobile; let JS set it */
 @media (max-width: 768px) {
   #bubbleContainer .bubble {
-    width: auto !important;   /* was 60px !important */
-    height: auto !important;  /* was 60px !important */
+    width: auto !重要;   /* was 60px !重要 */
+    height: auto !重要;  /* was 60px !重要 */
   }
 }
 
 /* Final downsizing for mobile UI (smaller but full-width) */
 @media (max-width: 768px) {
   html, body, * {
-    font-size: 13px !important;      /* was 14–16px */
-    letter-spacing: 0.04em !important;
+    font-size: 13px !重要;      /* was 14–16px */
+    letter-spacing: 0.04em !重要;
   }
 
-  .ui-center { gap: 14px !important; }
+  .ui-center { gap: 14px !重要; }
 
   /* Controls */
-  #controls { padding: 10px 12px !important; gap: 8px !important; }
+  #controls { padding: 10px 12px !重要; gap: 8px !重要; }
   #controls input[type="text"],
   #controls button,
   #bubbleText {
-    height: 30px !important;         /* was 34px */
-    padding: 4px 8px !important;
-    font-size: 12px !important;
-    border-radius: 14px !important;
+    height: 30px !重要;         /* was 34px */
+    padding: 4px 8px !重要;
+    font-size: 12px !重要;
+    border-radius: 14px !重要;
   }
 
   /* Voice controls */
-  .voice-controls { gap: 8px !important; padding: 6px 10px !important; }
-  .vc-row { gap: 6px !important; }
-  .vc-label { font-size: 10.5px !important; }
+  .voice-controls { gap: 8px !重要; padding: 6px 10px !重要; }
+  .vc-row { gap: 6px !重要; }
+  .vc-label { font-size: 10.5px !重要; }
 
   /* Audio UI smaller */
-  .audio-ui { font-size: 11.5px !important; gap: 4px !important; }
+  .audio-ui { font-size: 11.5px !重要; gap: 4px !重要; }
   .audio-ui button,
-  .audio-play { width: 26px !important; height: 26px !important; }
-  .audio-time { font-size: 10px !important; }
+  .audio-play { width: 26px !重要; height: 26px !重要; }
+  .audio-time { font-size: 10px !重要; }
 
   /* Sliders smaller thumbs */
   #uiPitch::-webkit-slider-thumb { width: 12px; height: 12px; margin-top: -4px; }
@@ -1087,123 +1121,123 @@ html, body {
 
 @media (max-width: 420px) {
   html, body, * {
-    font-size: 12px !important;
-    letter-spacing: 0.02em !important;
+    font-size: 12px !重要;
+    letter-spacing: 0.02em !重要;
   }
 
   #controls input[type="text"],
   #controls button,
   #bubbleText {
-    height: 28px !important;
-    font-size: 11px !important;
-    padding: 4px 8px !important;
+    height: 28px !重要;
+    font-size: 11px !重要;
+    padding: 4px 8px !重要;
   }
 
-  .audio-ui { font-size: 11px !important; }
+  .audio-ui { font-size: 11px !重要; }
   .audio-ui button,
-  .audio-play { width: 24px !important; height: 24px !important; }
+  .audio-play { width: 24px !重要; height: 24px !重要; }
 }
 
 /* Ultra-compact mobile overrides (final) */
 @media (max-width: 768px) {
   html, body, * {
-    font-size: 12px !important;       /* smaller base font */
-    letter-spacing: 0.01em !important;
+    font-size: 12px !重要;       /* smaller base font */
+    letter-spacing: 0.01em !重要;
   }
 
   /* Controls: tighter padding and smaller inputs/buttons */
   #controls {
-    padding: 8px 10px !important;
-    gap: 6px !important;
+    padding: 8px 10px !重要;
+    gap: 6px !重要;
   }
   #controls input[type="text"],
   #controls button,
   #bubbleText {
-    height: 28px !important;
-    padding: 4px 8px !important;
-    font-size: 11px !important;
-    border-radius: 12px !important;
+    height: 28px !重要;
+    padding: 4px 8px !重要;
+    font-size: 11px !重要;
+    border-radius: 12px !重要;
   }
 
   /* Voice controls: compact */
   .voice-controls {
-    padding: 6px 10px !important;
-    gap: 6px !important;
+    padding: 6px 10px !重要;
+    gap: 6px !重要;
   }
-  .vc-row { gap: 6px !important; }
-  .vc-label { font-size: 10px !important; }
+  .vc-row { gap: 6px !重要; }
+  .vc-label { font-size: 10px !重要; }
 
   /* Bubble open: tighter padding */
   .bubble--open {
-    padding: 12px !important;
-    max-width: 92vw !important;
-    max-height: 78vh !important;
+    padding: 12px !重要;
+    max-width: 92vw !重要;
+    max-height: 78vh !重要;
   }
 
   /* Audio UI smaller */
   .audio-ui {
-    font-size: 11px !important;
-    gap: 4px !important;
+    font-size: 11px !重要;
+    gap: 4px !重要;
   }
   .audio-ui button,
-  .audio-play { width: 24px !important; height: 24px !important; }
-  .audio-time { font-size: 10px !important; }
-  .audio-progress { height: 24px !important; }
+  .audio-play { width: 24px !重要; height: 24px !重要; }
+  .audio-time { font-size: 10px !重要; }
+  .audio-progress { height: 24px !重要; }
   .audio-progress::-webkit-slider-thumb { width: 12px; height: 12px; margin-top: -4px; }
   .audio-progress::-moz-range-thumb { width: 12px; height: 12px; }
-  #uiPitch { height: 24px !important; }
+  #uiPitch { height: 24px !重要; }
   #uiPitch::-webkit-slider-thumb { width: 12px; height: 12px; margin-top: -4px; }
   #uiPitch::-moz-range-thumb { width: 12px; height: 12px; }
 }
 
 @media (max-width: 420px) {
   html, body, * {
-    font-size: 11px !important;       /* smallest base font */
-    letter-spacing: 0.005em !important;
+    font-size: 11px !重要;       /* smallest base font */
+    letter-spacing: 0.005em !重要;
   }
 
   #controls input[type="text"],
   #controls button,
   #bubbleText {
-    height: 24px !important;
-    padding: 3px 6px !important;
-    font-size: 10px !important;
-    border-radius: 10px !important;
+    height: 24px !重要;
+    padding: 3px 6px !重要;
+    font-size: 10px !重要;
+    border-radius: 10px !重要;
   }
 
   .voice-controls {
-    padding: 4px 8px !important;
-    gap: 4px !important;
+    padding: 4px 8px !重要;
+    gap: 4px !重要;
   }
-  .vc-label { font-size: 9.5px !important; }
+  .vc-label { font-size: 9.5px !重要; }
 
-  .bubble--open { padding: 10px !important; max-width: 94vw !important; }
+  .bubble--open { padding: 10px !重要; max-width: 94vw !重要; }
 
-  .audio-ui { font-size: 10.5px !important; gap: 4px !important; }
+  .audio-ui { font-size: 10.5px !重要; gap: 4px !重要; }
   .audio-ui button,
-  .audio-play { width: 22px !important; height: 22px !important; }
-  .audio-time { font-size: 9.5px !important; }
-  .audio-progress { height: 22px !important; }
+  .audio-play { width: 22px !重要; height: 22px !重要; }
+  .audio-time { font-size: 9.5px !重要; }
+  .audio-progress { height: 22px !重要; }
   .audio-progress::-webkit-slider-thumb { width: 10px; height: 10px; margin-top: -4px; }
   .audio-progress::-moz-range-thumb { width: 10px; height: 10px; }
 
   /* Modal tighter on tiny phones */
   .modal-dialog {
-    width: min(480px, 94vw) !important;
-    padding: 10px !important;
+    width: min(480px, 94vw) !重要;
+    padding: 10px !重要;
   }
   .modal-actions button {
-    height: 30px !important;
-    padding: 0 10px !important;
-    font-size: 12px !important;
+    height: 30px !重要;
+    padding: 0 10px !重要;
+    font-size: 12px !重要;
   }
 }
 
 /* Ensure bubbles are not forced to fixed size on mobile (JS sets size) */
 @media (max-width: 768px) {
   #bubbleContainer .bubble {
-    width: auto !important;
-    height: auto !important;
+    width: auto !重要;
+    height: auto !重要;
   }
 }
 
