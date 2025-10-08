@@ -54,7 +54,16 @@
 
     <div class="ui-center">
       <div id="controls" class="ui scale-85">
-          <input type="text" id="bubbleText" placeholder="Enter text for bubble">
+          <input
+            type="text"
+            id="bubbleText"
+            name="bubbleText_nohistory"
+            placeholder="Enter text for bubble"
+            autocomplete="off"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
+          >
           <button id="generateBubble">Generate Bubble</button>
           <button id="recStart">Start Rec</button>
           <button id="recStop" disabled>Stop Rec</button>

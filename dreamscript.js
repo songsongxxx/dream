@@ -1227,4 +1227,16 @@ document.addEventListener('DOMContentLoaded', () => {
       alert('Cannot access microphone. Please check permissions.');
     }
   });
+
+  // Disable history suggestions and break Chrome’s stored mapping
+  const bt = $('bubbleText');
+  if (bt) {
+    bt.setAttribute('autocomplete', 'off');
+    bt.setAttribute('spellcheck', 'false');
+    bt.setAttribute('autocapitalize', 'off');
+    bt.setAttribute('autocorrect', 'off');
+    bt.addEventListener('focus', () => {
+      bt.name = 'bubbleText_' + Date.now(); // unique name prevents showing past entries
+    }, { once: true });
+  }
 });
